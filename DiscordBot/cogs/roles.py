@@ -18,27 +18,24 @@ class Roles(commands.Cog):
         if not custom_id.startswith("toggle_role_"):
             return
 
-        await inter.response.defer(ephemeral=True)
+        # Тихо подтверждаем нажатие кнопки без изменения сообщения
+        await inter.response.defer()
         role_id_str = custom_id.replace("toggle_role_", "")
         if not role_id_str.isdigit():
-            await inter.edit_original_response(content="⚠️ Некорректный идентификатор роли.")
             return
 
         role = inter.guild.get_role(int(role_id_str))
         if not role:
-            await inter.edit_original_response(content="⚠️ Данная роль не найдена на сервере.")
             return
 
         member = inter.author
         try:
             if role in member.roles:
                 await member.remove_roles(role, reason="Снятие роли по кнопке")
-                await inter.edit_original_response(content=f"🔴 Роль **{role.name}** снята.")
             else:
                 await member.add_roles(role, reason="Получение роли по кнопке")
-                await inter.edit_original_response(content=f"🟢 Вам выдана роль **{role.name}**!")
         except disnake.Forbidden:
-            await inter.edit_original_response(content="⚠️ Ошибка прав: роль бота должна стоять выше этой роли в настройках сервера.")
+            pass
 
     @commands.slash_command(contexts=GUILD_ONLY, name="give_role", description="Выдать роль участнику (для модераторов)")
     @commands.default_member_permissions(manage_roles=True)
@@ -219,7 +216,7 @@ class Roles(commands.Cog):
         embed.set_footer(text=UNIFIED_FOOTER)
 
         view = build_role_buttons_view(target_roles)
-        await msg.edit(embed=embed, view=view)
+        await msg.edit(content=None, embed=embed, view=view)
         await inter.edit_original_response(content=f"✅ Блок ролей для категории **«{category}»** успешно обновлен!")
 
 def setup(bot: commands.Bot):

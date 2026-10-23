@@ -45,18 +45,17 @@ class Verification(commands.Cog):
         if inter.component.custom_id != "persistent_verify_button":
             return
 
-        await inter.response.defer(ephemeral=True)
+        # Тихо подтверждаем клик без редактирования сообщения панели
+        await inter.response.defer()
         guild_id = str(inter.guild_id)
         user_id = str(inter.author.id)
 
         guild_config = await api.get_guild_config(guild_id)
         if not guild_config or not guild_config.get("verificationRoleId"):
-            await inter.edit_original_response(content="❌ Роль верификации еще не настроена администрацией.")
             return
 
         verify_role = inter.guild.get_role(int(guild_config["verificationRoleId"]))
         if not verify_role:
-            await inter.edit_original_response(content="⚠️ Роль верификации не найдена на сервере.")
             return
 
         profile = await api.get_user_profile(guild_id, user_id)
@@ -84,14 +83,10 @@ class Verification(commands.Cog):
 
         was_already_verified = verify_role in inter.author.roles
         if was_already_verified and not roles_to_give:
-            await inter.edit_original_response(content="ℹ️ Вы уже успешно верифицированы, и все ваши роли активны!")
             return
 
         success = await api.verify_user(guild_id, user_id)
         if not success:
-            await inter.edit_original_response(
-                content="⚠️ Сервер базы данных временно недоступен. Пожалуйста, попробуйте через 1-2 минуты."
-            )
             return
 
         try:
@@ -99,14 +94,7 @@ class Verification(commands.Cog):
             roles_mentions = ", ".join(r.mention for r in roles_to_give)
 
             if was_already_verified:
-                await inter.edit_original_response(
-                    content=f"♻️ Ваши сохраненные роли из базы данных восстановлены: {roles_mentions}"
-                )
                 return
-
-            await inter.edit_original_response(
-                content=f"✅ Вы успешно подтвердили свой профиль! Выданы роли: {roles_mentions}"
-            )
 
             if guild_config.get("welcomeChannelId"):
                 welcome_channel = inter.guild.get_channel(int(guild_config["welcomeChannelId"]))
@@ -145,7 +133,7 @@ class Verification(commands.Cog):
             await send_log(inter.guild, log_embed)
 
         except disnake.Forbidden:
-            await inter.edit_original_response(content="⚠️ Ошибка прав: роль бота должна стоять выше выдаваемых ролей.")
+            pass
 
     @commands.slash_command(
         contexts=GUILD_ONLY,
@@ -317,7 +305,7 @@ class Verification(commands.Cog):
         new_label = button_label or (old_btn.label if old_btn and old_btn.label else "Инициализировать допуск")
         new_emoji = button_emoji or (str(old_btn.emoji) if old_btn and old_btn.emoji else "🤖")
         view = VerifyView(button_label=new_label, button_emoji=new_emoji)
-        await msg.edit(embed=new_embed, view=view)
+        await msg.edit(content=None, embed=new_embed, view=view)
         await inter.edit_original_response(content="✅ Панель верификации успешно обновлена!")
 
 def setup(bot: commands.Bot):

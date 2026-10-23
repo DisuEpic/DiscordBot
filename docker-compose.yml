@@ -28,16 +28,12 @@ services:
         condition: service_healthy
     environment:
       ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: "http://0.0.0.0:5298"
       ConnectionStrings__DefaultConnection: "Host=db;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}"
       ApiKey: ${API_KEY}
       AutoMigrate: "true"
     ports:
-      - "127.0.0.1:5298:8080"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/api/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      - "127.0.0.1:5298:5298"
     networks:
       - aigis_net
 
@@ -48,14 +44,12 @@ services:
     container_name: aigis_bot
     restart: unless-stopped
     depends_on:
-      backend:
-        condition: service_healthy
+      - backend
+      - db
     environment:
       BOT_TOKEN: ${BOT_TOKEN}
-      API_BASE_URL: ${API_BASE_URL:-http://backend:8080/api}
+      API_BASE_URL: ${API_BASE_URL:-http://backend:5298/api}
       API_KEY: ${API_KEY}
-    volumes:
-      - ./DiscordBot/welcome_config.json:/app/welcome_config.json
     networks:
       - aigis_net
 
