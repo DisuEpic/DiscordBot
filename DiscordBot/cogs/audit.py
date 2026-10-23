@@ -33,6 +33,8 @@ class Audit(commands.Cog):
         self.bot = bot
         self._recent_joins: Dict[int, deque] = {}
         self._last_raid_alert: Dict[int, float] = {}
+        # Словарь для подавления спама логов при автовозврате ролей (user_id -> timestamp)
+        self._restoring_members: Dict[int, float] = {}
 
     @commands.Cog.listener()
     async def on_message(self, message: disnake.Message):
@@ -203,10 +205,12 @@ class Audit(commands.Cog):
 
                 if roles_to_add:
                     try:
+                        # Запоминаем участника: глушим спам в логах на 4 секунды
+                        self._restoring_members[member.id] = time.time()
                         await member.add_roles(*roles_to_add, reason="Автовосстановление ролей из базы")
                         restored_roles = roles_to_add
                     except disnake.HTTPException:
-                        pass
+                        self._restoring_members.pop(member.id, None)
 
         embed = disnake.Embed(
             title="📥 Новый участник на сервере",
@@ -224,6 +228,12 @@ class Audit(commands.Cog):
             )
         embed.set_footer(text=UNIFIED_FOOTER)
         await send_log(member.guild, embed)
+
+        # Очистка старых записей из словаря подавления
+        current_time = time.time()
+        for u_id, t in list(self._restoring_members.items()):
+            if current_time - t > 10:
+                self._restoring_members.pop(u_id, None)
 
         if len(joins) >= RAID_JOIN_THRESHOLD and now - self._last_raid_alert.get(member.guild.id, 0) > RAID_ALERT_COOLDOWN:
             self._last_raid_alert[member.guild.id] = now
@@ -272,12 +282,18 @@ class Audit(commands.Cog):
             added_roles = [r for r in after.roles if r not in before.roles and not r.is_default()]
             removed_roles = [r for r in before.roles if r not in after.roles and not r.is_default()]
             if added_roles or removed_roles:
+                # В PostgreSQL сохраняем всегда
                 await api.update_user_roles_batch(
                     str(after.guild.id),
                     str(after.id),
                     [str(r.id) for r in added_roles],
                     [str(r.id) for r in removed_roles]
                 )
+
+                # Если роли выданы ботом при автовозврате — НЕ дублируем лог
+                restore_time = self._restoring_members.get(after.id)
+                if restore_time and (time.time() - restore_time) < 4.0:
+                    return
 
                 embed = disnake.Embed(
                     title="🎭 Изменение ролей участника",
