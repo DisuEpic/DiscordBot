@@ -1,0 +1,207 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "C:\\Users\\theep\\OneDrive\\\u0420\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\DiscordBot\\DiscordBot_API\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{DC85D7C5-BD0E-672D-287B-19635DF43656}|DiscordBot_API\\DiscordBot_API.csproj|c:\\users\\theep\\onedrive\\\u0440\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\discordbot\\discordbot_api\\discordbot_api\\controllers\\rolescontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{DC85D7C5-BD0E-672D-287B-19635DF43656}|DiscordBot_API\\DiscordBot_API.csproj|solutionrelative:discordbot_api\\controllers\\rolescontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{DC85D7C5-BD0E-672D-287B-19635DF43656}|DiscordBot_API\\DiscordBot_API.csproj|c:\\users\\theep\\onedrive\\\u0440\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\discordbot\\discordbot_api\\discordbot_api\\models.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{DC85D7C5-BD0E-672D-287B-19635DF43656}|DiscordBot_API\\DiscordBot_API.csproj|solutionrelative:discordbot_api\\models.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{DC85D7C5-BD0E-672D-287B-19635DF43656}|DiscordBot_API\\DiscordBot_API.csproj|c:\\users\\theep\\onedrive\\\u0440\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\discordbot\\discordbot_api\\discordbot_api\\dto\\dtos.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{DC85D7C5-BD0E-672D-287B-19635DF43656}|DiscordBot_API\\DiscordBot_API.csproj|solutionrelative:discordbot_api\\dto\\dtos.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{DC85D7C5-BD0E-672D-287B-19635DF43656}|DiscordBot_API\\DiscordBot_API.csproj|c:\\users\\theep\\onedrive\\\u0440\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\discordbot\\discordbot_api\\discordbot_api\\data\\appdbcontext.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{DC85D7C5-BD0E-672D-287B-19635DF43656}|DiscordBot_API\\DiscordBot_API.csproj|solutionrelative:discordbot_api\\data\\appdbcontext.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{DC85D7C5-BD0E-672D-287B-19635DF43656}|DiscordBot_API\\DiscordBot_API.csproj|c:\\users\\theep\\onedrive\\\u0440\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\discordbot\\discordbot_api\\discordbot_api\\controllers\\userscontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{DC85D7C5-BD0E-672D-287B-19635DF43656}|DiscordBot_API\\DiscordBot_API.csproj|solutionrelative:discordbot_api\\controllers\\userscontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{DC85D7C5-BD0E-672D-287B-19635DF43656}|DiscordBot_API\\DiscordBot_API.csproj|c:\\users\\theep\\onedrive\\\u0440\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\discordbot\\discordbot_api\\discordbot_api\\middleware\\apikeymiddleware.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{DC85D7C5-BD0E-672D-287B-19635DF43656}|DiscordBot_API\\DiscordBot_API.csproj|solutionrelative:discordbot_api\\middleware\\apikeymiddleware.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{DC85D7C5-BD0E-672D-287B-19635DF43656}|DiscordBot_API\\DiscordBot_API.csproj|c:\\users\\theep\\onedrive\\\u0440\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\discordbot\\discordbot_api\\discordbot_api\\helpers\\snowflake.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{DC85D7C5-BD0E-672D-287B-19635DF43656}|DiscordBot_API\\DiscordBot_API.csproj|solutionrelative:discordbot_api\\helpers\\snowflake.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{DC85D7C5-BD0E-672D-287B-19635DF43656}|DiscordBot_API\\DiscordBot_API.csproj|c:\\users\\theep\\onedrive\\\u0440\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\discordbot\\discordbot_api\\discordbot_api\\controllers\\configcontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{DC85D7C5-BD0E-672D-287B-19635DF43656}|DiscordBot_API\\DiscordBot_API.csproj|solutionrelative:discordbot_api\\controllers\\configcontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{DC85D7C5-BD0E-672D-287B-19635DF43656}|DiscordBot_API\\DiscordBot_API.csproj|c:\\users\\theep\\onedrive\\\u0440\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\discordbot\\discordbot_api\\discordbot_api\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{DC85D7C5-BD0E-672D-287B-19635DF43656}|DiscordBot_API\\DiscordBot_API.csproj|solutionrelative:discordbot_api\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{DC85D7C5-BD0E-672D-287B-19635DF43656}|DiscordBot_API\\DiscordBot_API.csproj|c:\\users\\theep\\onedrive\\\u0440\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\discordbot\\discordbot_api\\discordbot_api\\appsettings.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}",
+      "RelativeMoniker": "D:0:0:{DC85D7C5-BD0E-672D-287B-19635DF43656}|DiscordBot_API\\DiscordBot_API.csproj|solutionrelative:discordbot_api\\appsettings.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 1,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedHeight": 363,
+          "SelectedChildIndex": -1,
+          "Children": [
+            {
+              "$type": "Bookmark",
+              "Name": "ST:128:0:{75188d03-9892-4ae2-abf1-207126247ce5}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:129:0:{75188d03-9892-4ae2-abf1-207126247ce5}"
+            }
+          ]
+        },
+        {
+          "DockedHeight": 37,
+          "SelectedChildIndex": 4,
+          "Children": [
+            {
+              "$type": "Bookmark",
+              "Name": "ST:128:0:{116d2292-e37d-41cd-a077-ebacac4c8cc4}"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 6,
+              "Title": "Snowflake.cs",
+              "DocumentMoniker": "C:\\Users\\theep\\OneDrive\\\u0420\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\DiscordBot\\DiscordBot_API\\DiscordBot_API\\Helpers\\Snowflake.cs",
+              "RelativeDocumentMoniker": "DiscordBot_API\\Helpers\\Snowflake.cs",
+              "ToolTip": "C:\\Users\\theep\\OneDrive\\\u0420\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\DiscordBot\\DiscordBot_API\\DiscordBot_API\\Helpers\\Snowflake.cs",
+              "RelativeToolTip": "DiscordBot_API\\Helpers\\Snowflake.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAABsAAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-10-19T10:30:04.36Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "DTOs.cs",
+              "DocumentMoniker": "C:\\Users\\theep\\OneDrive\\\u0420\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\DiscordBot\\DiscordBot_API\\DiscordBot_API\\DTO\\DTOs.cs",
+              "RelativeDocumentMoniker": "DiscordBot_API\\DTO\\DTOs.cs",
+              "ToolTip": "C:\\Users\\theep\\OneDrive\\\u0420\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\DiscordBot\\DiscordBot_API\\DiscordBot_API\\DTO\\DTOs.cs",
+              "RelativeToolTip": "DiscordBot_API\\DTO\\DTOs.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAA4AAABwAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-10-19T09:36:40.84Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
+              "Title": "AppDbContext.cs",
+              "DocumentMoniker": "C:\\Users\\theep\\OneDrive\\\u0420\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\DiscordBot\\DiscordBot_API\\DiscordBot_API\\Data\\AppDbContext.cs",
+              "RelativeDocumentMoniker": "DiscordBot_API\\Data\\AppDbContext.cs",
+              "ToolTip": "C:\\Users\\theep\\OneDrive\\\u0420\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\DiscordBot\\DiscordBot_API\\DiscordBot_API\\Data\\AppDbContext.cs",
+              "RelativeToolTip": "DiscordBot_API\\Data\\AppDbContext.cs",
+              "ViewState": "AgIAAA0AAAAAAAAAAAAqwCwAAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-10-04T16:03:45.261Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "RolesController.cs",
+              "DocumentMoniker": "C:\\Users\\theep\\OneDrive\\\u0420\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\DiscordBot\\DiscordBot_API\\DiscordBot_API\\Controllers\\RolesController.cs",
+              "RelativeDocumentMoniker": "DiscordBot_API\\Controllers\\RolesController.cs",
+              "ToolTip": "C:\\Users\\theep\\OneDrive\\\u0420\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\DiscordBot\\DiscordBot_API\\DiscordBot_API\\Controllers\\RolesController.cs",
+              "RelativeToolTip": "DiscordBot_API\\Controllers\\RolesController.cs",
+              "ViewState": "AgIAAGAAAAAAAAAAAAAAAHkAAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-10-04T15:55:57.49Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 7,
+              "Title": "ConfigController.cs",
+              "DocumentMoniker": "C:\\Users\\theep\\OneDrive\\\u0420\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\DiscordBot\\DiscordBot_API\\DiscordBot_API\\Controllers\\ConfigController.cs",
+              "RelativeDocumentMoniker": "DiscordBot_API\\Controllers\\ConfigController.cs",
+              "ToolTip": "C:\\Users\\theep\\OneDrive\\\u0420\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\DiscordBot\\DiscordBot_API\\DiscordBot_API\\Controllers\\ConfigController.cs",
+              "RelativeToolTip": "DiscordBot_API\\Controllers\\ConfigController.cs",
+              "ViewState": "AgIAADAAAAAAAAAAAAAQwDsAAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-09-28T10:54:17.956Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 4,
+              "Title": "UsersController.cs",
+              "DocumentMoniker": "C:\\Users\\theep\\OneDrive\\\u0420\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\DiscordBot\\DiscordBot_API\\DiscordBot_API\\Controllers\\UsersController.cs",
+              "RelativeDocumentMoniker": "DiscordBot_API\\Controllers\\UsersController.cs",
+              "ToolTip": "C:\\Users\\theep\\OneDrive\\\u0420\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\DiscordBot\\DiscordBot_API\\DiscordBot_API\\Controllers\\UsersController.cs",
+              "RelativeToolTip": "DiscordBot_API\\Controllers\\UsersController.cs",
+              "ViewState": "AgIAAEQAAAAAAAAAAAAAAGMAAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-09-28T10:39:04.798Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "Models.cs",
+              "DocumentMoniker": "C:\\Users\\theep\\OneDrive\\\u0420\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\DiscordBot\\DiscordBot_API\\DiscordBot_API\\Models.cs",
+              "RelativeDocumentMoniker": "DiscordBot_API\\Models.cs",
+              "ToolTip": "C:\\Users\\theep\\OneDrive\\\u0420\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\DiscordBot\\DiscordBot_API\\DiscordBot_API\\Models.cs",
+              "RelativeToolTip": "DiscordBot_API\\Models.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAACEAAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-09-29T14:49:56.747Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 8,
+              "Title": "Program.cs",
+              "DocumentMoniker": "C:\\Users\\theep\\OneDrive\\\u0420\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\DiscordBot\\DiscordBot_API\\DiscordBot_API\\Program.cs",
+              "RelativeDocumentMoniker": "DiscordBot_API\\Program.cs",
+              "ToolTip": "C:\\Users\\theep\\OneDrive\\\u0420\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\DiscordBot\\DiscordBot_API\\DiscordBot_API\\Program.cs",
+              "RelativeToolTip": "DiscordBot_API\\Program.cs",
+              "ViewState": "AgIAABkAAAAAAAAAAAAYwDcAAAAKAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-10-19T10:31:45.409Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 9,
+              "Title": "appsettings.json",
+              "DocumentMoniker": "C:\\Users\\theep\\OneDrive\\\u0420\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\DiscordBot\\DiscordBot_API\\DiscordBot_API\\appsettings.json",
+              "RelativeDocumentMoniker": "DiscordBot_API\\appsettings.json",
+              "ToolTip": "C:\\Users\\theep\\OneDrive\\\u0420\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\DiscordBot\\DiscordBot_API\\DiscordBot_API\\appsettings.json",
+              "RelativeToolTip": "DiscordBot_API\\appsettings.json",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAsAAAA4AAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001642|",
+              "WhenOpened": "2026-10-04T18:44:49.011Z"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{34e76e81-ee4a-11d0-ae2e-00a0c90fffc3}"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 5,
+              "Title": "ApiKeyMiddleware.cs",
+              "DocumentMoniker": "C:\\Users\\theep\\OneDrive\\\u0420\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\DiscordBot\\DiscordBot_API\\DiscordBot_API\\Middleware\\ApiKeyMiddleware.cs",
+              "RelativeDocumentMoniker": "DiscordBot_API\\Middleware\\ApiKeyMiddleware.cs",
+              "ToolTip": "C:\\Users\\theep\\OneDrive\\\u0420\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\DiscordBot\\DiscordBot_API\\DiscordBot_API\\Middleware\\ApiKeyMiddleware.cs",
+              "RelativeToolTip": "DiscordBot_API\\Middleware\\ApiKeyMiddleware.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAC0AAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-10-19T10:30:53.845Z"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
