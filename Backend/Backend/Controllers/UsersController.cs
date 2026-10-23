@@ -97,4 +97,26 @@ public class UsersController : ControllerBase
         await _context.SaveChangesAsync();
         return Ok(new { message = "Роли пользователя обновлены", roles = user.Roles });
     }
+    [HttpPost("{guildId}/{discordId}/roles/batch")]
+    public async Task<IActionResult> BatchUpdateUserRoles(string guildId, string discordId, [FromBody] BatchUpdateRolesRequest request)
+    {
+        if (ValidateIds(guildId, discordId) is { } error) return error;
+
+        var toAdd = (request.AddRoleIds ?? new List<string>()).Where(Snowflake.IsValid).ToList();
+        var toRemove = (request.RemoveRoleIds ?? new List<string>()).Where(Snowflake.IsValid).ToHashSet();
+
+        var user = await EnsureUserExistsAsync(guildId, discordId);
+
+        var rolesSet = user.Roles.ToHashSet();
+        rolesSet.ExceptWith(toRemove);
+        foreach (var r in toAdd)
+        {
+            rolesSet.Add(r);
+        }
+
+        user.Roles = rolesSet.ToList();
+        await _context.SaveChangesAsync();
+
+        return Ok(new { message = "Роли пользователя пакетно обновлены", roles = user.Roles });
+    }
 }

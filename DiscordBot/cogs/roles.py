@@ -18,7 +18,6 @@ class Roles(commands.Cog):
         if not custom_id.startswith("toggle_role_"):
             return
 
-        # Тихо подтверждаем нажатие кнопки без изменения сообщения
         await inter.response.defer()
         role_id_str = custom_id.replace("toggle_role_", "")
         if not role_id_str.isdigit():
@@ -26,6 +25,7 @@ class Roles(commands.Cog):
 
         role = inter.guild.get_role(int(role_id_str))
         if not role:
+            await inter.followup.send("⚠️ Данная роль больше не существует на сервере.", ephemeral=True)
             return
 
         member = inter.author
@@ -35,7 +35,10 @@ class Roles(commands.Cog):
             else:
                 await member.add_roles(role, reason="Получение роли по кнопке")
         except disnake.Forbidden:
-            pass
+            await inter.followup.send(
+                "⚠️ Ошибка прав: роль бота должна находиться выше этой роли в настройках сервера.",
+                ephemeral=True
+            )
 
     @commands.slash_command(contexts=GUILD_ONLY, name="give_role", description="Выдать роль участнику (для модераторов)")
     @commands.default_member_permissions(manage_roles=True)

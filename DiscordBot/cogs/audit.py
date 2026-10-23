@@ -1,5 +1,4 @@
 import time
-import asyncio
 import disnake
 from disnake.ext import commands
 from typing import List, Dict
@@ -10,6 +9,24 @@ from config import (
     AIGIS_GOLD, COMBAT_RED, TACTICAL_GREEN, P3_BLUE, UNIFIED_FOOTER,
     RAID_WINDOW_SECONDS, RAID_JOIN_THRESHOLD, RAID_ALERT_COOLDOWN, YOUNG_ACCOUNT_DAYS
 )
+
+def is_safe_to_restore_role(role: disnake.Role, bot_top_role: disnake.Role | None) -> bool:
+    if role.is_default() or role.managed:
+        return False
+    if bot_top_role is not None and role >= bot_top_role:
+        return False
+    perms = role.permissions
+    if (
+        perms.administrator
+        or perms.manage_guild
+        or perms.manage_roles
+        or perms.manage_channels
+        or perms.ban_members
+        or perms.kick_members
+        or perms.moderate_members
+    ):
+        return False
+    return True
 
 class Audit(commands.Cog):
     def __init__(self, bot: commands.Bot):
@@ -165,7 +182,7 @@ class Audit(commands.Cog):
         age_days = (disnake.utils.utcnow() - member.created_at).days
         young = age_days < YOUNG_ACCOUNT_DAYS
 
-        # Автовозврат сохраненных ролей
+        # Безопасный и пакетный автовозврат сохраненных ролей
         restored_roles: List[disnake.Role] = []
         if not member.bot:
             profile = await api.get_user_profile(str(member.guild.id), str(member.id))
@@ -175,15 +192,19 @@ class Audit(commands.Cog):
                 if profile.get("isVerified") and cfg.get("verificationRoleId"):
                     saved_role_ids.add(str(cfg["verificationRoleId"]))
 
+                bot_top_role = member.guild.me.top_role if member.guild.me else None
+                roles_to_add: List[disnake.Role] = []
                 for r_id in saved_role_ids:
                     if not r_id.isdigit():
                         continue
                     role = member.guild.get_role(int(r_id))
-                    if not role or role.is_default() or role.managed:
-                        continue
+                    if role and role not in member.roles and is_safe_to_restore_role(role, bot_top_role):
+                        roles_to_add.append(role)
+
+                if roles_to_add:
                     try:
-                        await member.add_roles(role, reason="Автовосстановление ролей из базы")
-                        restored_roles.append(role)
+                        await member.add_roles(*roles_to_add, reason="Автовосстановление ролей из базы")
+                        restored_roles = roles_to_add
                     except disnake.HTTPException:
                         pass
 
@@ -251,17 +272,12 @@ class Audit(commands.Cog):
             added_roles = [r for r in after.roles if r not in before.roles and not r.is_default()]
             removed_roles = [r for r in before.roles if r not in after.roles and not r.is_default()]
             if added_roles or removed_roles:
-                guild_id_str = str(after.guild.id)
-                user_id_str = str(after.id)
-
-                tasks = [
-                    api.update_user_role(guild_id_str, user_id_str, str(r.id), add=True)
-                    for r in added_roles
-                ] + [
-                    api.update_user_role(guild_id_str, user_id_str, str(r.id), add=False)
-                    for r in removed_roles
-                ]
-                await asyncio.gather(*tasks, return_exceptions=True)
+                await api.update_user_roles_batch(
+                    str(after.guild.id),
+                    str(after.id),
+                    [str(r.id) for r in added_roles],
+                    [str(r.id) for r in removed_roles]
+                )
 
                 embed = disnake.Embed(
                     title="🎭 Изменение ролей участника",

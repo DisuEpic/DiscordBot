@@ -2,6 +2,7 @@
 
 public record VerifyRequest(string GuildId, string DiscordId);
 public record UpdateRoleRequest(string RoleId, bool Add);
+public record BatchUpdateRolesRequest(List<string>? AddRoleIds, List<string>? RemoveRoleIds);
 
 public record ConfigRequest(
     string GuildId,

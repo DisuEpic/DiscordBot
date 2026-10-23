@@ -7,6 +7,7 @@ from typing import Optional, List
 from api import api
 from utils import send_log
 from views import VerifyView
+from cogs.audit import is_safe_to_restore_role
 from config import (
     GUILD_ONLY, VERIFY_TIMEOUT_MINUTES, VERIFY_WINDOW_HOURS,
     TACTICAL_GREEN, COMBAT_RED, UNIFIED_FOOTER, log
@@ -45,17 +46,18 @@ class Verification(commands.Cog):
         if inter.component.custom_id != "persistent_verify_button":
             return
 
-        # Тихо подтверждаем клик без редактирования сообщения панели
         await inter.response.defer()
         guild_id = str(inter.guild_id)
         user_id = str(inter.author.id)
 
         guild_config = await api.get_guild_config(guild_id)
         if not guild_config or not guild_config.get("verificationRoleId"):
+            await inter.followup.send("❌ Роль верификации еще не настроена администрацией.", ephemeral=True)
             return
 
         verify_role = inter.guild.get_role(int(guild_config["verificationRoleId"]))
         if not verify_role:
+            await inter.followup.send("⚠️ Роль верификации не найдена на сервере.", ephemeral=True)
             return
 
         profile = await api.get_user_profile(guild_id, user_id)
@@ -74,10 +76,7 @@ class Verification(commands.Cog):
                 r
                 and r not in inter.author.roles
                 and r not in roles_to_give
-                and not r.is_default()
-                and not r.managed
-                and not r.permissions.administrator
-                and (bot_top_role is None or r < bot_top_role)
+                and is_safe_to_restore_role(r, bot_top_role)
             ):
                 roles_to_give.append(r)
 
@@ -87,6 +86,7 @@ class Verification(commands.Cog):
 
         success = await api.verify_user(guild_id, user_id)
         if not success:
+            await inter.followup.send("⚠️ Сервер базы данных временно недоступен, попробуйте через минуту.", ephemeral=True)
             return
 
         try:
@@ -133,7 +133,7 @@ class Verification(commands.Cog):
             await send_log(inter.guild, log_embed)
 
         except disnake.Forbidden:
-            pass
+            await inter.followup.send("⚠️ Ошибка прав: роль бота должна стоять выше выдаваемых ролей.", ephemeral=True)
 
     @commands.slash_command(
         contexts=GUILD_ONLY,

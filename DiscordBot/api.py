@@ -59,6 +59,13 @@ class BackendClient:
         )
         return status == 200
 
+    async def update_user_roles_batch(
+        self, guild_id: str, discord_id: str, add_role_ids: List[str], remove_role_ids: List[str]
+    ) -> bool:
+        payload = {"addRoleIds": add_role_ids, "removeRoleIds": remove_role_ids}
+        status, _ = await self._request("POST", f"/users/{guild_id}/{discord_id}/roles/batch", json=payload)
+        return status == 200
+
     async def get_user_profile(self, guild_id: str, discord_id: str) -> Optional[Dict[str, Any]]:
         status, data = await self._request("GET", f"/users/{guild_id}/{discord_id}")
         return data if status == 200 else None
