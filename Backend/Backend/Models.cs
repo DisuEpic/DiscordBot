@@ -20,6 +20,9 @@ public class ServerConfig
     public string? VerificationRoleId { get; set; }
     public string? LogChannelId { get; set; }
     public string? TrapChannelId { get; set; }
+    public string? WelcomeTitle {  get; set; }
+    public string? WelcomeDescription { get; set; }
+    public string? VoiceGeneratorChannelId { get; set; }
 }
 
 [Table("Reactions")]

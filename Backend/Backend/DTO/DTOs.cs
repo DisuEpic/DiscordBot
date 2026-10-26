@@ -9,7 +9,10 @@ public record ConfigRequest(
     string? WelcomeChannelId,
     string? VerificationRoleId,
     string? LogChannelId,
-    string? TrapChannelId);
+    string? TrapChannelId,
+    string? WelcomeTitle,
+    string? WelcomeDescription,
+    string? VoiceGeneratorChannelId);
 
 public record ReactionRoleRequest(string GuildId, string Category, string Emoji, string RoleId, string Name);
 

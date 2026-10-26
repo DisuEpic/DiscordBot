@@ -26,18 +26,18 @@ class Utility(commands.Cog):
         guild_id = str(inter.guild_id)
         existing = await api.get_guild_config(guild_id) or {}
         payload = {
+            **existing,
             "guildId": guild_id,
             "verificationRoleId": str(verification_role.id) if verification_role else existing.get("verificationRoleId"),
             "welcomeChannelId": str(welcome_channel.id) if welcome_channel else existing.get("welcomeChannelId"),
             "logChannelId": str(log_channel.id) if log_channel else existing.get("logChannelId"),
-            "trapChannelId": existing.get("trapChannelId")
         }
 
         if await api.save_guild_config(payload):
             embed = disnake.Embed(title="⚙️ Конфигурация сервера успешно сохранена!", color=TACTICAL_GREEN)
-            embed.add_field(name="Роль верификации", value=f"<@&{payload['verificationRoleId']}>" if payload["verificationRoleId"] else "Не задана", inline=False)
-            embed.add_field(name="Канал приветствий", value=f"<#{payload['welcomeChannelId']}>" if payload["welcomeChannelId"] else "Не задан", inline=False)
-            embed.add_field(name="Канал аудита (логов)", value=f"<#{payload['logChannelId']}>" if payload["logChannelId"] else "Не задан", inline=False)
+            embed.add_field(name="Роль верификации", value=f"<@&{payload['verificationRoleId']}>" if payload.get("verificationRoleId") else "Не задана", inline=False)
+            embed.add_field(name="Канал приветствий", value=f"<#{payload['welcomeChannelId']}>" if payload.get("welcomeChannelId") else "Не задан", inline=False)
+            embed.add_field(name="Канал аудита (логов)", value=f"<#{payload['logChannelId']}>" if payload.get("logChannelId") else "Не задан", inline=False)
             embed.set_footer(text=UNIFIED_FOOTER)
             await inter.edit_original_response(embed=embed)
         else:
@@ -71,13 +71,14 @@ class Utility(commands.Cog):
         w_chan = f"<#{cfg['welcomeChannelId']}>" if cfg.get("welcomeChannelId") else "⚪ Отключен"
         l_chan = f"<#{cfg['logChannelId']}>" if cfg.get("logChannelId") else "⚪ Отключен"
         t_chan = f"<#{cfg['trapChannelId']}> (Кик за сообщение)" if cfg.get("trapChannelId") else "⚪ Отключен"
+        v_hub = f"<#{cfg['voiceGeneratorChannelId']}>" if cfg.get("voiceGeneratorChannelId") else "⚪ Отключен"
 
         categories_set = set(r.get("category") or "Общие" for r in guild_roles)
         roles_info = f"Всего: **{len(guild_roles)}** шт. в категориях: {', '.join(f'`{c}`' for c in categories_set)}" if guild_roles else "⚪ Роли не добавлены"
 
         embed = disnake.Embed(
-            title="⚙️ Центр управления Aigis • 7-е Поколение",
-            description=f"Текущая конфигурация защитного периметра сервера **{inter.guild.name}**:",
+            title="⚙️ Центр управления Aigis",
+            description=f"Текущая конфигурация сервера **{inter.guild.name}**:",
             color=P3_BLUE
         )
         if inter.guild.icon:
@@ -86,6 +87,7 @@ class Utility(commands.Cog):
         embed.add_field(name="🛡️ Роль верификации", value=v_role, inline=False)
         embed.add_field(name="👋 Канал приветствий", value=w_chan, inline=False)
         embed.add_field(name="📜 Канал аудита (логов)", value=l_chan, inline=False)
+        embed.add_field(name="🔊 Создание приватных войсов", value=v_hub, inline=False)
         embed.add_field(name="🤫 Канал-ловушка (Тишина)", value=t_chan, inline=False)
         embed.add_field(name="⏱️ Таймер автокика новичков", value=f"`{VERIFY_TIMEOUT_MINUTES} минут`", inline=False)
         embed.add_field(name="🎭 Роли для выбора (в базе)", value=roles_info, inline=False)
@@ -113,34 +115,33 @@ class Utility(commands.Cog):
         embed.set_footer(text=UNIFIED_FOOTER)
         await inter.edit_original_response(embed=embed)
 
-    @commands.slash_command(contexts=GUILD_ONLY, name="scan", description="🔍 Тактическое сканирование субъекта")
+    @commands.slash_command(contexts=GUILD_ONLY, name="scan", description="🔍 Информация об участнике")
     async def scan(
         self,
         inter: disnake.ApplicationCommandInteraction,
-        member: Optional[disnake.Member] = commands.Param(default=None, description="Кого сканировать")
+        member: Optional[disnake.Member] = commands.Param(default=None, description="Кого проверить")
     ):
         target = member or inter.author
         await inter.response.defer()
 
         persona_sync = (target.id % 60) + 40
-        threat_level = "🟢 Минимальный (Союзник)" if not target.guild_permissions.administrator else "👑 Высший (Командующий)"
+        threat_level = "🟢 Участник" if not target.guild_permissions.administrator else "👑 Администратор"
 
         embed = disnake.Embed(
-            title=f"🔍 Тактический анализ субъекта: {target.display_name}",
-            description="Отчет визуальных и телеметрических сенсоров Aigis:",
+            title=f"🔍 Информация об участнике: {target.display_name}",
             color=P3_BLUE
         )
         embed.set_thumbnail(url=target.display_avatar.url)
-        embed.add_field(name="Идентификатор (ID)", value=f"`{target.id}`", inline=True)
-        embed.add_field(name="Уровень угрозы", value=threat_level, inline=True)
-        embed.add_field(name="Синхронизация с Персоной", value=f"`{persona_sync}%`", inline=True)
-        embed.add_field(name="Интеграция в периметр", value=target.joined_at.strftime("%d.%m.%Y") if target.joined_at else "N/A", inline=True)
-        embed.add_field(name="Создание профиля", value=target.created_at.strftime("%d.%m.%Y"), inline=True)
-        embed.add_field(name="Активные роли", value=f"**{len(target.roles) - 1}** шт.", inline=True)
+        embed.add_field(name="ID", value=f"`{target.id}`", inline=True)
+        embed.add_field(name="Статус", value=threat_level, inline=True)
+        embed.add_field(name="Синхронизация", value=f"`{persona_sync}%`", inline=True)
+        embed.add_field(name="На сервере с", value=target.joined_at.strftime("%d.%m.%Y") if target.joined_at else "N/A", inline=True)
+        embed.add_field(name="Аккаунт создан", value=target.created_at.strftime("%d.%m.%Y"), inline=True)
+        embed.add_field(name="Роли", value=f"**{len(target.roles) - 1}** шт.", inline=True)
         embed.set_footer(text=UNIFIED_FOOTER)
         await inter.edit_original_response(embed=embed)
 
-    @commands.slash_command(contexts=GUILD_ONLY, name="ping", description="Диагностика Папиллонного сердца и задержки связи")
+    @commands.slash_command(contexts=GUILD_ONLY, name="ping", description="Проверка пинга и состояния базы данных")
     async def ping(self, inter: disnake.ApplicationCommandInteraction):
         await inter.response.defer()
         start_time = time.time()
@@ -150,17 +151,16 @@ class Utility(commands.Cog):
         discord_ping = round(self.bot.latency * 1000)
 
         embed = disnake.Embed(
-            title="🤖 Диагностика боевых систем Aigis",
-            description="Телеметрия аппаратных модулей и нейронной связи:",
+            title="🤖 Диагностика систем Aigis",
             color=P3_BLUE
         )
-        embed.add_field(name="📡 Шлюз Discord (Задержка)", value=f"`{discord_ping} ms`", inline=True)
-        embed.add_field(name="💾 База данных C# (Отклик)", value=f"`{backend_time} ms` ({backend_status})", inline=True)
-        embed.add_field(name="❤️ Папиллонное сердце", value="`Стабильно`", inline=True)
+        embed.add_field(name="📡 Шлюз Discord", value=f"`{discord_ping} ms`", inline=True)
+        embed.add_field(name="💾 База данных C#", value=f"`{backend_time} ms` ({backend_status})", inline=True)
+        embed.add_field(name="❤️ Статус", value="`Стабильно`", inline=True)
         embed.set_footer(text=UNIFIED_FOOTER)
         await inter.edit_original_response(embed=embed)
 
-    @commands.slash_command(contexts=GUILD_ONLY, name="server_info", description="Тактический отчет о состоянии сервера")
+    @commands.slash_command(contexts=GUILD_ONLY, name="server_info", description="Информация о сервере")
     async def server_info(self, inter: disnake.ApplicationCommandInteraction):
         guild = inter.guild
         humans = len([m for m in guild.members if not m.bot])
@@ -168,23 +168,22 @@ class Utility(commands.Cog):
         created_at = guild.created_at.strftime("%d.%m.%Y")
 
         embed = disnake.Embed(
-            title=f"📊 Тактический статус: {guild.name}",
-            description="Сводка данных по защищаемому периметру:",
+            title=f"📊 Информация о сервере: {guild.name}",
             color=P3_BLUE
         )
         if guild.icon:
             embed.set_thumbnail(url=guild.icon.url)
 
-        embed.add_field(name="👑 Командующий", value=f"<@{guild.owner_id}>", inline=True)
-        embed.add_field(name="📅 Дата основания", value=created_at, inline=True)
-        embed.add_field(name="👥 Контингент", value=f"Всего: **{guild.member_count}**\n(Людей: {humans} | Ботов: {bots})", inline=True)
-        embed.add_field(name="💬 Каналы связи", value=f"Текст: {len(guild.text_channels)} | Голос: {len(guild.voice_channels)}", inline=True)
-        embed.add_field(name="🎭 Сигнатуры ролей", value=f"Всего: **{len(guild.roles)}**", inline=True)
-        embed.add_field(name="🛡️ Уровень защиты", value=str(guild.verification_level).capitalize(), inline=True)
+        embed.add_field(name="👑 Владелец", value=f"<@{guild.owner_id}>", inline=True)
+        embed.add_field(name="📅 Создан", value=created_at, inline=True)
+        embed.add_field(name="👥 Участники", value=f"Всего: **{guild.member_count}**\n(Людей: {humans} | Ботов: {bots})", inline=True)
+        embed.add_field(name="💬 Каналы", value=f"Текст: {len(guild.text_channels)} | Голос: {len(guild.voice_channels)}", inline=True)
+        embed.add_field(name="🎭 Роли", value=f"Всего: **{len(guild.roles)}**", inline=True)
+        embed.add_field(name="🛡️ Защита", value=str(guild.verification_level).capitalize(), inline=True)
         embed.set_footer(text=UNIFIED_FOOTER)
         await inter.response.send_message(embed=embed)
 
-    @commands.slash_command(contexts=GUILD_ONLY, name="avatar", description="Сканирование визуального идентификатора (Аватар)")
+    @commands.slash_command(contexts=GUILD_ONLY, name="avatar", description="Посмотреть аватар участника")
     async def avatar(
         self,
         inter: disnake.ApplicationCommandInteraction,
@@ -194,8 +193,8 @@ class Utility(commands.Cog):
         avatar_url = target.display_avatar.url
 
         embed = disnake.Embed(
-            title=f"🔍 Визуальный идентификатор: {target.display_name}",
-            description=f"[Скачать аватар в оригинале]({avatar_url})",
+            title=f"🔍 Аватар: {target.display_name}",
+            description=f"[Скачать оригинал]({avatar_url})",
             color=P3_BLUE
         )
         embed.set_image(url=avatar_url)
@@ -210,17 +209,18 @@ class Utility(commands.Cog):
 
         user_data = await api.get_user_profile(str(inter.guild_id), str(target.id))
         if not user_data:
-            await inter.edit_original_response(content=f"Субъект {target.mention} еще не зарегистрирован в базе.")
+            await inter.edit_original_response(content=f"Участник {target.mention} еще не зарегистрирован в базе.")
             return
 
-        embed = disnake.Embed(title=f"📋 Личное дело: {target.display_name}", color=P3_BLUE)
+        embed = disnake.Embed(title=f"📋 Профиль в БД: {target.display_name}", color=P3_BLUE)
         embed.set_thumbnail(url=target.display_avatar.url)
-        embed.add_field(name="Идентификатор", value=f"`{user_data.get('discordId')}`", inline=True)
+        embed.add_field(name="Discord ID", value=f"`{user_data.get('discordId')}`", inline=True)
         embed.add_field(name="Статус верификации", value="✅ Подтвержден" if user_data.get("isVerified") else "❌ Не верифицирован", inline=True)
         roles_val = ", ".join(f"<@&{r}>" for r in user_data.get("roles", [])) or "Нет"
-        embed.add_field(name="Синхронизированные роли", value=roles_val[:1024], inline=False)
+        embed.add_field(name="Сохраненные роли", value=roles_val[:1024], inline=False)
         embed.set_footer(text=UNIFIED_FOOTER)
         await inter.edit_original_response(embed=embed)
+
     @commands.slash_command(contexts=GUILD_ONLY, name="test_join", description="Симитировать вход участника для теста возврата ролей")
     @commands.default_member_permissions(administrator=True)
     async def test_join(self, inter: disnake.ApplicationCommandInteraction, member: Optional[disnake.Member] = None):
@@ -230,5 +230,6 @@ class Utility(commands.Cog):
         if audit_cog:
             await audit_cog.on_member_join(target)
             await inter.edit_original_response(content=f"✅ Симуляция входа для {target.mention} выполнена! Проверь роли и канал логов.")
+
 def setup(bot: commands.Bot):
     bot.add_cog(Utility(bot))

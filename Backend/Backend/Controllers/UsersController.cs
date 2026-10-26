@@ -119,4 +119,19 @@ public class UsersController : ControllerBase
 
         return Ok(new { message = "Роли пользователя пакетно обновлены", roles = user.Roles });
     }
+    [HttpPost("unverify")]
+    public async Task<IActionResult> UnverifyUser([FromBody] VerifyRequest request)
+    {
+        if (ValidateIds(request.GuildId, request.DiscordId) is { } error)
+            return error;
+        var users = await _context.Users.FirstOrDefaultAsync(u => u.GuildId == request.GuildId && u.DiscordId == request.DiscordId);
+        if (users == null)
+        {
+            return NotFound(new { message = "Пользователь не найден в базе данных" });
+        }
+        users.IsVerified = false;
+        users.Roles.Clear();
+        await _context.SaveChangesAsync();
+        return Ok(new { message = " Верификация пользователя аннулирована, профиль сброшен." });
+    }
 }

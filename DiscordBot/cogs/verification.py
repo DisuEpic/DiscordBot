@@ -1,11 +1,10 @@
-import os
-import json
+import time
 import asyncio
 import disnake
 from disnake.ext import commands, tasks
 from typing import Optional, List
 from api import api
-from utils import send_log
+from utils import send_log, check_moderation_target
 from views import VerifyView
 from cogs.audit import is_safe_to_restore_role
 from config import (
@@ -13,24 +12,11 @@ from config import (
     TACTICAL_GREEN, COMBAT_RED, UNIFIED_FOOTER, log
 )
 
-WELCOME_CONFIG_FILE = "welcome_config.json"
-
-def load_welcome_config() -> dict:
-    if os.path.exists(WELCOME_CONFIG_FILE):
-        try:
-            with open(WELCOME_CONFIG_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception:
-            return {}
-    return {}
-
-def save_welcome_config(cfg: dict):
-    try:
-        with open(WELCOME_CONFIG_FILE, "w", encoding="utf-8") as f:
-            json.dump(cfg, f, ensure_ascii=False, indent=2)
-    except Exception as e:
-        log.error("Не удалось сохранить welcome_config.json: %s", e)
-
+DEFAULT_WELCOME_TITLE = "🛡️ Верификация пройдена: {server}"
+DEFAULT_WELCOME_DESC = (
+    "Участник {user} успешно прошел верификацию.\n"
+    "Добро пожаловать на сервер!"
+)
 
 class Verification(commands.Cog):
     def __init__(self, bot: commands.Bot):
@@ -99,12 +85,8 @@ class Verification(commands.Cog):
             if guild_config.get("welcomeChannelId"):
                 welcome_channel = inter.guild.get_channel(int(guild_config["welcomeChannelId"]))
                 if welcome_channel and isinstance(welcome_channel, disnake.TextChannel):
-                    custom_cfg = load_welcome_config().get(guild_id, {})
-                    raw_title = custom_cfg.get("title") or "🛡️ Допуск подтвержден: {server}"
-                    raw_desc = custom_cfg.get("description") or (
-                        "Субъект {user} успешно верифицирован в защитном реестре.\n"
-                        "Протоколы безопасности активированы. Добро пожаловать в периметр!"
-                    )
+                    raw_title = guild_config.get("welcomeTitle") or DEFAULT_WELCOME_TITLE
+                    raw_desc = guild_config.get("welcomeDescription") or DEFAULT_WELCOME_DESC
 
                     final_title = raw_title.replace("{user}", inter.author.display_name).replace("{server}", inter.guild.name)
                     final_desc = raw_desc.replace("{user}", inter.author.mention).replace("{server}", inter.guild.name)
@@ -115,7 +97,7 @@ class Verification(commands.Cog):
                         color=TACTICAL_GREEN
                     )
                     if len(roles_to_give) > 1:
-                        welcome_embed.add_field(name="♻️ Синхронизированы роли:", value=roles_mentions[:1024], inline=False)
+                        welcome_embed.add_field(name="♻️ Восстановлены роли:", value=roles_mentions[:1024], inline=False)
                     welcome_embed.set_thumbnail(url=inter.author.display_avatar.url)
                     welcome_embed.set_footer(text=UNIFIED_FOOTER)
                     try:
@@ -124,11 +106,15 @@ class Verification(commands.Cog):
                         pass
 
             log_embed = disnake.Embed(
-                title="🛡️ Субъект верифицирован",
-                description=f"Субъект {inter.author.mention} (`{inter.author.id}`) успешно прошел проверку личности.\n**Выданы роли:** {roles_mentions}",
+                title="✅ Участник верифицирован",
+                description=(
+                    f"**Участник:** {inter.author.mention} (`{inter.author.id}`)\n"
+                    f"**Выданы роли:** {roles_mentions}"
+                ),
                 color=TACTICAL_GREEN,
                 timestamp=disnake.utils.utcnow()
             )
+            log_embed.set_thumbnail(url=inter.author.display_avatar.url)
             log_embed.set_footer(text=UNIFIED_FOOTER)
             await send_log(inter.guild, log_embed)
 
@@ -137,8 +123,65 @@ class Verification(commands.Cog):
 
     @commands.slash_command(
         contexts=GUILD_ONLY,
+        name="unverify",
+        description="Снять верификацию с участника и очистить его сохраненные роли в БД"
+    )
+    @commands.default_member_permissions(moderate_members=True)
+    async def unverify_member(
+        self,
+        inter: disnake.ApplicationCommandInteraction,
+        member: disnake.Member = commands.Param(description="У кого снять верификацию"),
+        reason: str = commands.Param(default="Снятие верификации модератором", description="Причина")
+    ):
+        await inter.response.defer(ephemeral=True)
+        if error_msg := check_moderation_target(inter, member):
+            await inter.edit_original_response(content=error_msg)
+            return
+
+        guild_id = str(inter.guild_id)
+        bot_top_role = inter.guild.me.top_role if inter.guild.me else None
+
+        roles_to_remove = [
+            r for r in member.roles
+            if not r.is_default() and not r.managed and (bot_top_role is None or r < bot_top_role)
+        ]
+
+        audit_cog = self.bot.get_cog("Audit")
+        if audit_cog and hasattr(audit_cog, "_restoring_members"):
+            audit_cog._restoring_members[member.id] = time.time()
+
+        try:
+            if roles_to_remove:
+                await member.remove_roles(*roles_to_remove, reason=f"Снятие верификации: {reason} ({inter.author})")
+        except disnake.Forbidden:
+            await inter.edit_original_response(content="⚠️ У бота недостаточно прав для снятия ролей с этого участника.")
+            return
+
+        await api.unverify_user(guild_id, str(member.id))
+
+        await inter.edit_original_response(
+            content=f"🚫 Верификация участника {member.mention} снята! Удалено ролей: **{len(roles_to_remove)}** шт., профиль в БД очищен."
+        )
+
+        log_embed = disnake.Embed(
+            title="🚫 Верификация снята (Unverify)",
+            description=(
+                f"**Участник:** {member.mention} (`{member.id}`)\n"
+                f"**Модератор:** {inter.author.mention}\n"
+                f"**Причина:** {reason}\n"
+                f"**Снято ролей:** `{len(roles_to_remove)}` шт."
+            ),
+            color=COMBAT_RED,
+            timestamp=disnake.utils.utcnow()
+        )
+        log_embed.set_thumbnail(url=member.display_avatar.url)
+        log_embed.set_footer(text=UNIFIED_FOOTER)
+        await send_log(inter.guild, log_embed)
+
+    @commands.slash_command(
+        contexts=GUILD_ONLY,
         name="set_welcome",
-        description="Настроить текст карточки приветствия в канале"
+        description="Настроить текст карточки приветствия в базе данных"
     )
     @commands.default_member_permissions(administrator=True)
     async def set_welcome(
@@ -150,38 +193,40 @@ class Verification(commands.Cog):
     ):
         await inter.response.defer(ephemeral=True)
         guild_id = str(inter.guild_id)
-        all_cfg = load_welcome_config()
+        cfg = await api.get_guild_config(guild_id) or {"guildId": guild_id}
+        cfg["guildId"] = guild_id
 
         if reset_to_default:
-            all_cfg.pop(guild_id, None)
-            save_welcome_config(all_cfg)
-            await inter.edit_original_response(content="♻️ Приветствие сброшено к стандартному тексту.")
+            cfg["welcomeTitle"] = None
+            cfg["welcomeDescription"] = None
+            if await api.save_guild_config(cfg):
+                await inter.edit_original_response(content="♻️ Приветствие в базе данных сброшено к стандартному тексту.")
+            else:
+                await inter.edit_original_response(content="❌ Ошибка сохранения в БД.")
             return
 
         if not title and not description:
             await inter.edit_original_response(content="⚠️ Укажите новый заголовок или описание (или выберите сброс).")
             return
 
-        guild_welcome = all_cfg.setdefault(guild_id, {})
         if title:
-            guild_welcome["title"] = title
+            cfg["welcomeTitle"] = title
         if description:
-            guild_welcome["description"] = description
+            cfg["welcomeDescription"] = description
 
-        save_welcome_config(all_cfg)
+        if not await api.save_guild_config(cfg):
+            await inter.edit_original_response(content="❌ Не удалось сохранить шаблон приветствия в базу данных.")
+            return
 
-        sample_title = (guild_welcome.get("title") or "🛡️ Допуск подтвержден: {server}").replace("{user}", inter.author.display_name).replace("{server}", inter.guild.name)
-        sample_desc = (guild_welcome.get("description") or (
-            "Субъект {user} успешно верифицирован в защитном реестре.\n"
-            "Протоколы безопасности активированы. Добро пожаловать в периметр!"
-        )).replace("{user}", inter.author.mention).replace("{server}", inter.guild.name)
+        sample_title = (cfg.get("welcomeTitle") or DEFAULT_WELCOME_TITLE).replace("{user}", inter.author.display_name).replace("{server}", inter.guild.name)
+        sample_desc = (cfg.get("welcomeDescription") or DEFAULT_WELCOME_DESC).replace("{user}", inter.author.mention).replace("{server}", inter.guild.name)
 
         preview_embed = disnake.Embed(title=f"Предпросмотр: {sample_title}", description=sample_desc, color=TACTICAL_GREEN)
         preview_embed.set_thumbnail(url=inter.author.display_avatar.url)
         preview_embed.set_footer(text=UNIFIED_FOOTER)
 
         await inter.edit_original_response(
-            content="✅ Шаблон приветствия успешно сохранен! Предпросмотр:",
+            content="✅ Шаблон приветствия успешно сохранен в БД! Предпросмотр:",
             embed=preview_embed
         )
 
@@ -229,8 +274,11 @@ class Verification(commands.Cog):
                         await member.kick(reason=f"Не прошел верификацию за {VERIFY_TIMEOUT_MINUTES} минут")
 
                         log_embed = disnake.Embed(
-                            title="⏳ Автоматическое исключение (Таймаут верификации)",
-                            description=f"Субъект {member.mention} (`{member.id}`) не прошел верификацию за `{VERIFY_TIMEOUT_MINUTES}` мин. и был исключен.",
+                            title="⏳ Исключение (Таймаут верификации)",
+                            description=(
+                                f"**Участник:** {member.mention} (`{member.id}`)\n"
+                                f"**Причина:** Не прошел верификацию за `{VERIFY_TIMEOUT_MINUTES}` мин."
+                            ),
                             color=COMBAT_RED,
                             timestamp=disnake.utils.utcnow()
                         )
@@ -251,14 +299,14 @@ class Verification(commands.Cog):
     async def send_verify_panel(
         self,
         inter: disnake.ApplicationCommandInteraction,
-        title: str = "🛡️ Протокол допуска: Система безопасности Aigis",
+        title: str = "🛡️ Верификация на сервере",
         description: Optional[str] = None,
-        button_label: str = "Инициализировать допуск",
-        button_emoji: str = "🤖"
+        button_label: str = "Пройти верификацию",
+        button_emoji: str = "✅"
     ):
         final_desc = description or (
-            f"Приветствую. Я автономный модуль защиты сервера **{inter.guild.name}**. "
-            f"Для подтверждения личности и деактивации защитных барьеров инициализируйте допуск."
+            f"Добро пожаловать на сервер **{inter.guild.name}**!\n"
+            f"Нажмите на кнопку ниже, чтобы подтвердить профиль и получить доступ к каналам."
         )
         embed = disnake.Embed(title=title, description=final_desc, color=TACTICAL_GREEN)
         if inter.guild.icon:
@@ -302,8 +350,8 @@ class Verification(commands.Cog):
         new_embed.set_footer(text=UNIFIED_FOOTER)
 
         old_btn = msg.components[0].children[0] if msg.components and msg.components[0].children else None
-        new_label = button_label or (old_btn.label if old_btn and old_btn.label else "Инициализировать допуск")
-        new_emoji = button_emoji or (str(old_btn.emoji) if old_btn and old_btn.emoji else "🤖")
+        new_label = button_label or (old_btn.label if old_btn and old_btn.label else "Пройти верификацию")
+        new_emoji = button_emoji or (str(old_btn.emoji) if old_btn and old_btn.emoji else "✅")
         view = VerifyView(button_label=new_label, button_emoji=new_emoji)
         await msg.edit(content=None, embed=new_embed, view=view)
         await inter.edit_original_response(content="✅ Панель верификации успешно обновлена!")

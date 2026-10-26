@@ -33,7 +33,6 @@ class Audit(commands.Cog):
         self.bot = bot
         self._recent_joins: Dict[int, deque] = {}
         self._last_raid_alert: Dict[int, float] = {}
-        # Словарь для подавления спама логов при автовозврате ролей (user_id -> timestamp)
         self._restoring_members: Dict[int, float] = {}
 
     @commands.Cog.listener()
@@ -65,7 +64,7 @@ class Audit(commands.Cog):
                     await member.kick(reason=f"Сообщение в канале тишины #{message.channel.name}")
                     log_embed = disnake.Embed(
                         title="🚨 Исключение (Канал тишины)",
-                        description=f"Участник {member.mention} (`{member.id}`) написал сообщение в канале {message.channel.mention} и был исключён.",
+                        description=f"**Участник:** {member.mention} (`{member.id}`)\n**Канал:** {message.channel.mention}",
                         color=COMBAT_RED,
                         timestamp=disnake.utils.utcnow()
                     )
@@ -184,7 +183,6 @@ class Audit(commands.Cog):
         age_days = (disnake.utils.utcnow() - member.created_at).days
         young = age_days < YOUNG_ACCOUNT_DAYS
 
-        # Безопасный и пакетный автовозврат сохраненных ролей
         restored_roles: List[disnake.Role] = []
         if not member.bot:
             profile = await api.get_user_profile(str(member.guild.id), str(member.id))
@@ -205,7 +203,6 @@ class Audit(commands.Cog):
 
                 if roles_to_add:
                     try:
-                        # Запоминаем участника: глушим спам в логах на 4 секунды
                         self._restoring_members[member.id] = time.time()
                         await member.add_roles(*roles_to_add, reason="Автовосстановление ролей из базы")
                         restored_roles = roles_to_add
@@ -229,7 +226,6 @@ class Audit(commands.Cog):
         embed.set_footer(text=UNIFIED_FOOTER)
         await send_log(member.guild, embed)
 
-        # Очистка старых записей из словаря подавления
         current_time = time.time()
         for u_id, t in list(self._restoring_members.items()):
             if current_time - t > 10:
@@ -282,17 +278,18 @@ class Audit(commands.Cog):
             added_roles = [r for r in after.roles if r not in before.roles and not r.is_default()]
             removed_roles = [r for r in before.roles if r not in after.roles and not r.is_default()]
             if added_roles or removed_roles:
-                # В PostgreSQL сохраняем всегда
-                await api.update_user_roles_batch(
-                    str(after.guild.id),
-                    str(after.id),
-                    [str(r.id) for r in added_roles],
-                    [str(r.id) for r in removed_roles]
-                )
-
-                # Если роли выданы ботом при автовозврате — НЕ дублируем лог
                 restore_time = self._restoring_members.get(after.id)
-                if restore_time and (time.time() - restore_time) < 4.0:
+                is_suppressed = restore_time and (time.time() - restore_time) < 4.0
+
+                # Если это не принудительное снятие через /unverify, синхронизируем с БД
+                if not is_suppressed:
+                    await api.update_user_roles_batch(
+                        str(after.guild.id),
+                        str(after.id),
+                        [str(r.id) for r in added_roles],
+                        [str(r.id) for r in removed_roles]
+                    )
+                else:
                     return
 
                 embed = disnake.Embed(
@@ -337,7 +334,7 @@ class Audit(commands.Cog):
         elif before.channel is not None and after.channel is not None:
             embed = disnake.Embed(
                 title="🔀 Смена голосового канала",
-                description=f"**Участник:** {member.mention} (`{member.id}`)\n**Из:** `#{before.channel.name}` ➔ **В:** {after.channel.mention}",
+                description=f"**Участник:** {member.mention} (`{member.id}`)\n**Из:** {before.channel.mention} ➔ **В:** {after.channel.mention}",
                 color=AIGIS_GOLD,
                 timestamp=disnake.utils.utcnow()
             )
@@ -346,6 +343,10 @@ class Audit(commands.Cog):
 
     @commands.Cog.listener()
     async def on_guild_channel_create(self, channel: disnake.abc.GuildChannel):
+        voice_cog = self.bot.get_cog("VoiceHub")
+        if voice_cog and hasattr(voice_cog, "temp_channels") and channel.id in voice_cog.temp_channels:
+            return
+
         c_type = "💬 Текстовый" if isinstance(channel, disnake.TextChannel) else "🔊 Голосовой" if isinstance(channel, disnake.VoiceChannel) else "📁 Категория"
         embed = disnake.Embed(
             title="📁 Создан новый канал",
@@ -360,6 +361,11 @@ class Audit(commands.Cog):
 
     @commands.Cog.listener()
     async def on_guild_channel_delete(self, channel: disnake.abc.GuildChannel):
+        voice_cog = self.bot.get_cog("VoiceHub")
+        if voice_cog and hasattr(voice_cog, "deleted_temp_ids") and channel.id in voice_cog.deleted_temp_ids:
+            voice_cog.deleted_temp_ids.discard(channel.id)
+            return
+
         c_type = "💬 Текстовый" if isinstance(channel, disnake.TextChannel) else "🔊 Голосовой" if isinstance(channel, disnake.VoiceChannel) else "📁 Категория"
         embed = disnake.Embed(
             title="🗑️ Канал удален",

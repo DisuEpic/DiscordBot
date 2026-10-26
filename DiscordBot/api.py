@@ -48,10 +48,13 @@ class BackendClient:
     async def health(self) -> bool:
         status, _ = await self._request("GET", "/health")
         return status == 200
-
+    
     async def verify_user(self, guild_id: str, discord_id: str) -> bool:
         status, _ = await self._request("POST", "/users/verify", json={"guildId": guild_id, "discordId": discord_id})
         return status == 200
+    async def unverify_user(self, guild_id: str, discord_id: str) -> bool:
+            status, _ = await self._request("POST", "/users/unverify", json={"guildId": guild_id, "discordId": discord_id})
+            return status == 200
 
     async def update_user_role(self, guild_id: str, discord_id: str, role_id: str, add: bool) -> bool:
         status, _ = await self._request(

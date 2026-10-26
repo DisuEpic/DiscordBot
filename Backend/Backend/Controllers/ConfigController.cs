@@ -37,7 +37,8 @@ public class ConfigController : ControllerBase
         if (!Snowflake.TryNormalizeOptional(request.WelcomeChannelId, out var welcomeId) ||
             !Snowflake.TryNormalizeOptional(request.VerificationRoleId, out var verifyRoleId) ||
             !Snowflake.TryNormalizeOptional(request.LogChannelId, out var logId) ||
-            !Snowflake.TryNormalizeOptional(request.TrapChannelId, out var trapId))
+            !Snowflake.TryNormalizeOptional(request.TrapChannelId, out var trapId) ||
+            !Snowflake.TryNormalizeOptional(request.VoiceGeneratorChannelId, out var voiceGenId))
         {
             return BadRequest(new { message = "Один или несколько указанных ID каналов/ролей имеют некорректный формат Snowflake." });
         }
@@ -53,6 +54,9 @@ public class ConfigController : ControllerBase
         config.VerificationRoleId = verifyRoleId;
         config.LogChannelId = logId;
         config.TrapChannelId = trapId;
+        config.VoiceGeneratorChannelId = voiceGenId;
+        config.WelcomeTitle = request.WelcomeTitle;
+        config.WelcomeDescription = request.WelcomeDescription;
 
         await _context.SaveChangesAsync();
         return Ok(new { message = "Конфигурация сервера успешно сохранена!" });

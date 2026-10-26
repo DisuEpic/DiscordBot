@@ -25,6 +25,7 @@ def build_role_buttons_view(roles_subset: List[Dict[str, Any]], button_style: di
             custom_id=f"toggle_role_{r['roleId']}"
         ))
     return view
+
 class ConfirmResetView(disnake.ui.View):
     def __init__(self, author_id: int):
         super().__init__(timeout=30)
@@ -42,7 +43,10 @@ class ConfirmResetView(disnake.ui.View):
             "verificationRoleId": None,
             "welcomeChannelId": None,
             "logChannelId": None,
-            "trapChannelId": None
+            "trapChannelId": None,
+            "welcomeTitle": None,
+            "welcomeDescription": None,
+            "voiceGeneratorChannelId": None
         }
 
         if await api.save_guild_config(reset_payload):
@@ -64,6 +68,7 @@ class ConfirmResetView(disnake.ui.View):
             await inter.response.send_message("❌ Только автор команды может управлять этой панелью.", ephemeral=True)
             return
         await inter.response.edit_message(content=None, view=SettingsDashboardView(self.author_id))
+
 class SettingsDashboardView(disnake.ui.View):
     def __init__(self, author_id: int):
         super().__init__(timeout=180)
@@ -119,6 +124,7 @@ class SettingsDashboardView(disnake.ui.View):
             )
         else:
             await inter.edit_original_response(content="❌ Не удалось сохранить настройки: API недоступен.")
+
     @disnake.ui.button(label="Сбросить всё (Reset)", style=disnake.ButtonStyle.danger, emoji="♻️")
     async def full_reset(self, button: disnake.ui.Button, inter: disnake.MessageInteraction):
         if inter.author.id != self.author_id:
@@ -126,6 +132,6 @@ class SettingsDashboardView(disnake.ui.View):
             return
 
         await inter.response.edit_message(
-            content="⚠️ **Вы уверены?** Будут сброшены роль верификации, каналы приветствий, логов и ловушка. Действие необратимо.",
+            content="⚠️ **Вы уверены?** Будут сброшены роль верификации, каналы приветствий, логов, приватных войсов и ловушка. Действие необратимо.",
             view=ConfirmResetView(self.author_id)
         )
