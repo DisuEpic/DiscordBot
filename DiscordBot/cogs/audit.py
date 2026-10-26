@@ -136,7 +136,7 @@ class Audit(commands.Cog):
             return
 
         embed = disnake.Embed(
-            title="🗑️ Сообщение удалено (вне кэша бота)",
+            title="🗑️ Сообщение удалено",
             description=f"**Канал:** <#{payload.channel_id}>\n**ID сообщения:** `{payload.message_id}`\n*Текст неизвестен: сообщение было отправлено до запуска бота.*",
             color=COMBAT_RED,
             timestamp=disnake.utils.utcnow()
@@ -159,7 +159,7 @@ class Audit(commands.Cog):
             return
 
         embed = disnake.Embed(
-            title="✏️ Сообщение отредактировано (вне кэша бота)",
+            title="✏️ Сообщение отредактировано",
             description=f"**Автор:** <@{author.get('id', 0)}>\n**Канал:** <#{payload.channel_id}>\n**ID сообщения:** `{payload.message_id}`",
             color=AIGIS_GOLD,
             timestamp=disnake.utils.utcnow()
@@ -327,7 +327,7 @@ class Audit(commands.Cog):
         elif before.channel is not None and after.channel is None:
             embed = disnake.Embed(
                 title="🔇 Отключение от голосового канала",
-                description=f"**Участник:** {member.mention} (`{member.id}`)\n**Канал:** `#{before.channel.name}`",
+                description=f"**Участник:** {member.mention} (`{member.id}`)\n**Канал:** `#{after.channel.mention}`",
                 color=disnake.Color.dark_grey(),
                 timestamp=disnake.utils.utcnow()
             )
