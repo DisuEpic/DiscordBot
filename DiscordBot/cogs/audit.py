@@ -327,7 +327,7 @@ class Audit(commands.Cog):
         elif before.channel is not None and after.channel is None:
             embed = disnake.Embed(
                 title="🔇 Отключение от голосового канала",
-                description=f"**Участник:** {member.mention} (`{member.id}`)\n**Канал:** `#{after.channel.name}`",
+                description=f"**Участник:** {member.mention} (`{member.id}`)\n**Канал:** `#{before.channel.mention}`",
                 color=disnake.Color.dark_grey(),
                 timestamp=disnake.utils.utcnow()
             )
