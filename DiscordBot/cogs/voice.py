@@ -153,6 +153,7 @@ class VoiceHub(commands.Cog):
                 new_channel = await guild.create_voice_channel(
                     name=f"╠ 〘🔊〙 {member.display_name}"[:40],
                     category=category,
+                    position=after.channel.position + 1,
                     overwrites=overwrites,
                     reason=f"Приватная комната для {member}"
                 )
