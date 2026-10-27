@@ -20,12 +20,16 @@ class RenameVoiceModal(disnake.ui.Modal):
         super().__init__(title="✏️ Переименовать голосовой канал", components=components)
 
     async def callback(self, inter: disnake.ModalInteraction):
-        new_name = inter.text_values["new_voice_name"].strip()
-        try:
-            await self.channel.edit(name=new_name)
-            await inter.response.send_message(f"✅ Канал переименован в **{new_name}**!", ephemeral=True)
-        except disnake.HTTPException:
-            await inter.response.send_message("⚠️ Discord разрешает менять название канала не чаще 2 раз за 10 минут.", ephemeral=True)
+     raw_name = inter.text_values["new_voice_name"].strip()
+     if not raw_name.startswith(("╠", "╚", "╔")):
+         new_name = f"╠ 〘🔊〙 {raw_name}"[:40]
+     else:
+         new_name = raw_name[:40]
+     try:
+         await self.channel.edit(name=new_name)
+         await inter.response.send_message(f"✅ Канал переименован в **{new_name}**!", ephemeral=True)
+     except disnake.HTTPException:
+         await inter.response.send_message("⚠️ Discord разрешает менять название канала не чаще 2 раз за 10 минут.", ephemeral=True)
 
 
 class VoiceControlView(disnake.ui.View):
@@ -147,7 +151,7 @@ class VoiceHub(commands.Cog):
 
             try:
                 new_channel = await guild.create_voice_channel(
-                    name=f"🔊 Комната {member.display_name}"[:40],
+                    name=f"╠ 〘🔊〙 {member.display_name}"[:40],
                     category=category,
                     overwrites=overwrites,
                     reason=f"Приватная комната для {member}"
