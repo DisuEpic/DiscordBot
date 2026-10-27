@@ -1,7 +1,7 @@
 import time
 import disnake
 from disnake.ext import commands
-from typing import List, Dict
+from typing import List, Dict, Optional
 from collections import deque
 from api import api
 from utils import send_log, send_welcome_card
@@ -27,6 +27,28 @@ def is_safe_to_restore_role(role: disnake.Role, bot_top_role: disnake.Role | Non
     ):
         return False
     return True
+
+
+async def fetch_recent_audit_entry(
+    guild: disnake.Guild,
+    action: disnake.AuditLogAction,
+    target_id: Optional[int] = None,
+    max_age_seconds: float = 8.0
+) -> Optional[disnake.AuditLogEntry]:
+    """Ищет недавнюю запись в Журнале Аудита Discord, чтобы узнать, кто совершил действие."""
+    if not guild.me or not guild.me.guild_permissions.view_audit_log:
+        return None
+    try:
+        now = disnake.utils.utcnow()
+        async for entry in guild.audit_logs(limit=5, action=action):
+            if (now - entry.created_at).total_seconds() > max_age_seconds:
+                continue
+            if target_id is None or (entry.target and entry.target.id == target_id):
+                return entry
+    except disnake.HTTPException:
+        pass
+    return None
+
 
 class Audit(commands.Cog):
     def __init__(self, bot: commands.Bot):
@@ -78,9 +100,20 @@ class Audit(commands.Cog):
         if message.author.bot or not message.guild:
             return
 
+        deleter_text = ""
+        entry = await fetch_recent_audit_entry(
+            message.guild, disnake.AuditLogAction.message_delete, target_id=message.author.id
+        )
+        if entry and entry.user and entry.user.id != message.author.id:
+            deleter_text = f"\n**Удалил модератор:** {entry.user.mention}"
+
         embed = disnake.Embed(
             title="🗑️ Сообщение удалено",
-            description=f"**Автор:** {message.author.mention} (`{message.author.id}`)\n**Канал:** {message.channel.mention}",
+            description=(
+                f"**Автор:** {message.author.mention} (`{message.author.id}`)\n"
+                f"**Канал:** {message.channel.mention}"
+                f"{deleter_text}"
+            ),
             color=COMBAT_RED,
             timestamp=disnake.utils.utcnow()
         )
@@ -253,6 +286,25 @@ class Audit(commands.Cog):
 
     @commands.Cog.listener()
     async def on_member_remove(self, member: disnake.Member):
+        # Проверяем, не был ли это кик через стандартный интерфейс Discord
+        entry = await fetch_recent_audit_entry(member.guild, disnake.AuditLogAction.kick, target_id=member.id)
+        if entry and entry.user and entry.user.id != self.bot.user.id:
+            reason = entry.reason or "Причина не указана"
+            embed = disnake.Embed(
+                title="👢 Участник исключен (Кик)",
+                description=(
+                    f"**Исключен:** {member.mention} (`{member.id}`)\n"
+                    f"**Модератор:** {entry.user.mention}\n"
+                    f"**Причина:** {reason}"
+                ),
+                color=COMBAT_RED,
+                timestamp=disnake.utils.utcnow()
+            )
+            embed.set_thumbnail(url=member.display_avatar.url)
+            embed.set_footer(text=UNIFIED_FOOTER)
+            await send_log(member.guild, embed)
+            return
+
         embed = disnake.Embed(
             title="🚪 Участник покинул сервер",
             description=f"**Участник:** {member.mention} (`{member.name}`)\n**ID:** `{member.id}`",
@@ -264,10 +316,47 @@ class Audit(commands.Cog):
         await send_log(member.guild, embed)
 
     @commands.Cog.listener()
+    async def on_member_ban(self, guild: disnake.Guild, user: disnake.User):
+        entry = await fetch_recent_audit_entry(guild, disnake.AuditLogAction.ban, target_id=user.id)
+        if entry and entry.user and entry.user.id == self.bot.user.id:
+            return  # Уже залогировано командой /ban
+
+        mod_text = f"\n**Модератор:** {entry.user.mention}" if (entry and entry.user) else ""
+        reason_text = f"\n**Причина:** {entry.reason}" if (entry and entry.reason) else ""
+
+        embed = disnake.Embed(
+            title="🔨 Участник заблокирован (Бан)",
+            description=f"**Забанен:** {user.mention} (`{user.id}`){mod_text}{reason_text}",
+            color=COMBAT_RED,
+            timestamp=disnake.utils.utcnow()
+        )
+        embed.set_thumbnail(url=user.display_avatar.url)
+        embed.set_footer(text=UNIFIED_FOOTER)
+        await send_log(guild, embed)
+
+    @commands.Cog.listener()
+    async def on_member_unban(self, guild: disnake.Guild, user: disnake.User):
+        entry = await fetch_recent_audit_entry(guild, disnake.AuditLogAction.unban, target_id=user.id)
+        if entry and entry.user and entry.user.id == self.bot.user.id:
+            return  # Уже залогировано командой /unban
+
+        mod_text = f"\n**Модератор:** {entry.user.mention}" if (entry and entry.user) else ""
+        embed = disnake.Embed(
+            title="🔓 Пользователь разблокирован (Unban)",
+            description=f"**Пользователь:** {user.mention} (`{user.id}`){mod_text}",
+            color=TACTICAL_GREEN,
+            timestamp=disnake.utils.utcnow()
+        )
+        embed.set_thumbnail(url=user.display_avatar.url)
+        embed.set_footer(text=UNIFIED_FOOTER)
+        await send_log(guild, embed)
+
+    @commands.Cog.listener()
     async def on_member_update(self, before: disnake.Member, after: disnake.Member):
         if after.bot:
             return
 
+        # 1. Изменение никнейма
         if before.nick != after.nick:
             old_nick = before.nick or before.name
             new_nick = after.nick or after.name
@@ -283,6 +372,36 @@ class Audit(commands.Cog):
             embed.set_footer(text=UNIFIED_FOOTER)
             await send_log(after.guild, embed)
 
+        # 2. Выдача или снятие таймаута через стандартный интерфейс Discord
+        if before.current_timeout != after.current_timeout:
+            entry = await fetch_recent_audit_entry(after.guild, disnake.AuditLogAction.member_update, target_id=after.id)
+            if not (entry and entry.user and entry.user.id == self.bot.user.id):
+                mod_mention = entry.user.mention if (entry and entry.user) else "Неизвестно"
+                if after.current_timeout and after.current_timeout > disnake.utils.utcnow():
+                    until_str = disnake.utils.format_dt(after.current_timeout, style="f")
+                    embed = disnake.Embed(
+                        title="🔇 Применен таймаут",
+                        description=(
+                            f"**Участник:** {after.mention} (`{after.id}`)\n"
+                            f"**Модератор:** {mod_mention}\n"
+                            f"**До:** {until_str}"
+                        ),
+                        color=AIGIS_GOLD,
+                        timestamp=disnake.utils.utcnow()
+                    )
+                    embed.set_footer(text=UNIFIED_FOOTER)
+                    await send_log(after.guild, embed)
+                elif before.current_timeout and after.current_timeout is None:
+                    embed = disnake.Embed(
+                        title="🔊 Таймаут снят",
+                        description=f"**Участник:** {after.mention} (`{after.id}`)\n**Модератор:** {mod_mention}",
+                        color=TACTICAL_GREEN,
+                        timestamp=disnake.utils.utcnow()
+                    )
+                    embed.set_footer(text=UNIFIED_FOOTER)
+                    await send_log(after.guild, embed)
+
+        # 3. Изменение ролей
         if before.roles != after.roles:
             added_roles = [r for r in after.roles if r not in before.roles and not r.is_default()]
             removed_roles = [r for r in before.roles if r not in after.roles and not r.is_default()]
@@ -322,7 +441,6 @@ class Audit(commands.Cog):
         cfg = await api.get_guild_config(str(member.guild.id))
         gen_id_str = str(cfg.get("voiceGeneratorChannelId")) if cfg and cfg.get("voiceGeneratorChannelId") else None
 
-        # Игнорируем технический вход в канал «➕ Создать комнату», так как человека тут же перебросит
         if after.channel and gen_id_str and str(after.channel.id) == gen_id_str:
             return
 
@@ -370,10 +488,13 @@ class Audit(commands.Cog):
         if voice_cog and hasattr(voice_cog, "temp_channels") and channel.id in voice_cog.temp_channels:
             return
 
+        entry = await fetch_recent_audit_entry(channel.guild, disnake.AuditLogAction.channel_create, target_id=channel.id)
+        creator_text = f"\n**Создал:** {entry.user.mention}" if (entry and entry.user) else ""
+
         c_type = "💬 Текстовый" if isinstance(channel, disnake.TextChannel) else "🔊 Голосовой" if isinstance(channel, disnake.VoiceChannel) else "📁 Категория"
         embed = disnake.Embed(
             title="📁 Создан новый канал",
-            description=f"**Канал:** {channel.mention} (`#{channel.name}`)\n**Тип:** {c_type}",
+            description=f"**Канал:** {channel.mention} (`#{channel.name}`)\n**Тип:** {c_type}{creator_text}",
             color=TACTICAL_GREEN,
             timestamp=disnake.utils.utcnow()
         )
@@ -389,10 +510,13 @@ class Audit(commands.Cog):
             voice_cog.deleted_temp_ids.discard(channel.id)
             return
 
+        entry = await fetch_recent_audit_entry(channel.guild, disnake.AuditLogAction.channel_delete, target_id=channel.id)
+        deleter_text = f"\n**Удалил:** {entry.user.mention}" if (entry and entry.user) else ""
+
         c_type = "💬 Текстовый" if isinstance(channel, disnake.TextChannel) else "🔊 Голосовой" if isinstance(channel, disnake.VoiceChannel) else "📁 Категория"
         embed = disnake.Embed(
             title="🗑️ Канал удален",
-            description=f"**Название:** `#{channel.name}`\n**Тип:** {c_type}",
+            description=f"**Название:** `#{channel.name}`\n**Тип:** {c_type}{deleter_text}",
             color=COMBAT_RED,
             timestamp=disnake.utils.utcnow()
         )
@@ -424,9 +548,12 @@ class Audit(commands.Cog):
 
     @commands.Cog.listener()
     async def on_guild_role_create(self, role: disnake.Role):
+        entry = await fetch_recent_audit_entry(role.guild, disnake.AuditLogAction.role_create, target_id=role.id)
+        creator_text = f"\n**Создал:** {entry.user.mention}" if (entry and entry.user) else ""
+
         embed = disnake.Embed(
             title="✨ Создана новая роль",
-            description=f"**Роль:** {role.mention} (`{role.name}`)\n**Цвет:** `{str(role.color)}`",
+            description=f"**Роль:** {role.mention} (`{role.name}`)\n**Цвет:** `{str(role.color)}`{creator_text}",
             color=TACTICAL_GREEN,
             timestamp=disnake.utils.utcnow()
         )
@@ -435,9 +562,12 @@ class Audit(commands.Cog):
 
     @commands.Cog.listener()
     async def on_guild_role_delete(self, role: disnake.Role):
+        entry = await fetch_recent_audit_entry(role.guild, disnake.AuditLogAction.role_delete, target_id=role.id)
+        deleter_text = f"\n**Удалил:** {entry.user.mention}" if (entry and entry.user) else ""
+
         embed = disnake.Embed(
             title="🔥 Роль сервера удалена",
-            description=f"**Бывшее название:** `{role.name}`\n**ID роли:** `{role.id}`",
+            description=f"**Бывшее название:** `{role.name}`\n**ID роли:** `{role.id}`{deleter_text}",
             color=COMBAT_RED,
             timestamp=disnake.utils.utcnow()
         )
