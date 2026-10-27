@@ -1,6 +1,13 @@
 import disnake
 from typing import Optional, List, Dict, Any
 from api import api
+from config import TACTICAL_GREEN, UNIFIED_FOOTER
+
+DEFAULT_WELCOME_TITLE = "👋 Добро пожаловать на {server}!"
+DEFAULT_WELCOME_DESC = (
+    "Приветствуем, {user}!\n"
+    "Рады видеть тебя на нашем сервере!"
+)
 
 async def send_log(guild: disnake.Guild, embed: disnake.Embed):
     cfg = await api.get_guild_config(str(guild.id))
@@ -16,6 +23,45 @@ async def send_log(guild: disnake.Guild, embed: disnake.Embed):
             await log_channel.send(embed=embed)
         except disnake.Forbidden:
             pass
+
+async def send_welcome_card(
+    member: disnake.Member,
+    guild_config: Dict[str, Any],
+    extra_roles: Optional[List[disnake.Role]] = None
+):
+    welcome_channel_id = guild_config.get("welcomeChannelId")
+    if not welcome_channel_id:
+        return
+    try:
+        welcome_channel = member.guild.get_channel(int(welcome_channel_id))
+    except (ValueError, TypeError):
+        return
+
+    if not welcome_channel or not isinstance(welcome_channel, disnake.TextChannel):
+        return
+
+    raw_title = guild_config.get("welcomeTitle") or DEFAULT_WELCOME_TITLE
+    raw_desc = guild_config.get("welcomeDescription") or DEFAULT_WELCOME_DESC
+
+    final_title = raw_title.replace("{user}", member.display_name).replace("{server}", member.guild.name)
+    final_desc = raw_desc.replace("{user}", member.mention).replace("{server}", member.guild.name)
+
+    welcome_embed = disnake.Embed(
+        title=final_title,
+        description=final_desc,
+        color=TACTICAL_GREEN
+    )
+    if extra_roles:
+        roles_mentions = ", ".join(r.mention for r in extra_roles)
+        welcome_embed.add_field(name="♻️ Восстановлены роли:", value=roles_mentions[:1024], inline=False)
+
+    welcome_embed.set_thumbnail(url=member.display_avatar.url)
+    welcome_embed.set_footer(text=UNIFIED_FOOTER)
+
+    try:
+        await welcome_channel.send(embed=welcome_embed)
+    except disnake.Forbidden:
+        pass
 
 def parse_emoji(raw: Optional[str]):
     raw = (raw or "").strip()

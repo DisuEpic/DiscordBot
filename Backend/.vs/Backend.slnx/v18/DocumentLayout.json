@@ -52,8 +52,16 @@
         },
         {
           "DockedWidth": 30,
-          "SelectedChildIndex": 0,
+          "SelectedChildIndex": 2,
           "Children": [
+            {
+              "$type": "Bookmark",
+              "Name": "ST:128:0:{116d2292-e37d-41cd-a077-ebacac4c8cc4}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{34e76e81-ee4a-11d0-ae2e-00a0c90fffc3}"
+            },
             {
               "$type": "Document",
               "DocumentIndex": 0,
@@ -77,8 +85,7 @@
               "RelativeToolTip": "Backend\\Controllers\\UsersController.cs",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAAIYAAABgAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-10-26T14:42:27.074Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-10-26T14:42:27.074Z"
             },
             {
               "$type": "Document",
@@ -90,12 +97,7 @@
               "RelativeToolTip": "Backend\\Helpers\\Snowflake.cs",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-10-26T14:37:17.666Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Bookmark",
-              "Name": "ST:128:0:{116d2292-e37d-41cd-a077-ebacac4c8cc4}"
+              "WhenOpened": "2026-10-26T14:37:17.666Z"
             },
             {
               "$type": "Document",
@@ -107,8 +109,7 @@
               "RelativeToolTip": "Backend\\DTO\\DTOs.cs",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAAA4AAAAhAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-10-26T14:29:39.599Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-10-26T14:29:39.599Z"
             },
             {
               "$type": "Document",
@@ -120,8 +121,7 @@
               "RelativeToolTip": "Backend\\appsettings.json",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAAA8AAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001642|",
-              "WhenOpened": "2026-10-22T15:04:24.192Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-10-22T15:04:24.192Z"
             },
             {
               "$type": "Document",
@@ -133,8 +133,7 @@
               "RelativeToolTip": "Backend\\Models.cs",
               "ViewState": "AgIAAAcAAAAAAAAAAAAgwBcAAAAlAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-10-22T14:57:20.698Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-10-22T14:57:20.698Z"
             },
             {
               "$type": "Document",
@@ -146,12 +145,7 @@
               "RelativeToolTip": "Backend\\Controllers\\ConfigController.cs",
               "ViewState": "AgIAABwAAAAAAAAAAAAuwDoAAAA/AAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-10-22T14:57:17.621Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Bookmark",
-              "Name": "ST:0:0:{34e76e81-ee4a-11d0-ae2e-00a0c90fffc3}"
+              "WhenOpened": "2026-10-22T14:57:17.621Z"
             }
           ]
         }

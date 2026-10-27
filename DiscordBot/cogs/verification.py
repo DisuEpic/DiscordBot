@@ -4,18 +4,15 @@ import disnake
 from disnake.ext import commands, tasks
 from typing import Optional, List
 from api import api
-from utils import send_log, check_moderation_target
+from utils import (
+    send_log, send_welcome_card, check_moderation_target,
+    DEFAULT_WELCOME_TITLE, DEFAULT_WELCOME_DESC
+)
 from views import VerifyView
 from cogs.audit import is_safe_to_restore_role
 from config import (
     GUILD_ONLY, VERIFY_TIMEOUT_MINUTES, VERIFY_WINDOW_HOURS,
     TACTICAL_GREEN, COMBAT_RED, UNIFIED_FOOTER, log
-)
-
-DEFAULT_WELCOME_TITLE = "🛡️ Верификация пройдена: {server}"
-DEFAULT_WELCOME_DESC = (
-    "Участник {user} успешно прошел верификацию.\n"
-    "Добро пожаловать на сервер!"
 )
 
 class Verification(commands.Cog):
@@ -82,28 +79,9 @@ class Verification(commands.Cog):
             if was_already_verified:
                 return
 
-            if guild_config.get("welcomeChannelId"):
-                welcome_channel = inter.guild.get_channel(int(guild_config["welcomeChannelId"]))
-                if welcome_channel and isinstance(welcome_channel, disnake.TextChannel):
-                    raw_title = guild_config.get("welcomeTitle") or DEFAULT_WELCOME_TITLE
-                    raw_desc = guild_config.get("welcomeDescription") or DEFAULT_WELCOME_DESC
-
-                    final_title = raw_title.replace("{user}", inter.author.display_name).replace("{server}", inter.guild.name)
-                    final_desc = raw_desc.replace("{user}", inter.author.mention).replace("{server}", inter.guild.name)
-
-                    welcome_embed = disnake.Embed(
-                        title=final_title,
-                        description=final_desc,
-                        color=TACTICAL_GREEN
-                    )
-                    if len(roles_to_give) > 1:
-                        welcome_embed.add_field(name="♻️ Восстановлены роли:", value=roles_mentions[:1024], inline=False)
-                    welcome_embed.set_thumbnail(url=inter.author.display_avatar.url)
-                    welcome_embed.set_footer(text=UNIFIED_FOOTER)
-                    try:
-                        await welcome_channel.send(embed=welcome_embed)
-                    except disnake.Forbidden:
-                        pass
+            # Отправляем приветственную карточку при успешной первичной верификации
+            extra_restored = [r for r in roles_to_give if r != verify_role]
+            await send_welcome_card(inter.author, guild_config, extra_roles=extra_restored)
 
             log_embed = disnake.Embed(
                 title="✅ Участник верифицирован",

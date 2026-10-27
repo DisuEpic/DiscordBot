@@ -4,7 +4,7 @@ from disnake.ext import commands
 from typing import List, Dict
 from collections import deque
 from api import api
-from utils import send_log
+from utils import send_log, send_welcome_card
 from config import (
     AIGIS_GOLD, COMBAT_RED, TACTICAL_GREEN, P3_BLUE, UNIFIED_FOOTER,
     RAID_WINDOW_SECONDS, RAID_JOIN_THRESHOLD, RAID_ALERT_COOLDOWN, YOUNG_ACCOUNT_DAYS
@@ -184,9 +184,11 @@ class Audit(commands.Cog):
         young = age_days < YOUNG_ACCOUNT_DAYS
 
         restored_roles: List[disnake.Role] = []
+        cfg = await api.get_guild_config(str(member.guild.id)) or {}
+        profile = None
+
         if not member.bot:
             profile = await api.get_user_profile(str(member.guild.id), str(member.id))
-            cfg = await api.get_guild_config(str(member.guild.id)) or {}
             if profile:
                 saved_role_ids = set(str(r) for r in (profile.get("roles") or []))
                 if profile.get("isVerified") and cfg.get("verificationRoleId"):
@@ -208,6 +210,16 @@ class Audit(commands.Cog):
                         restored_roles = roles_to_add
                     except disnake.HTTPException:
                         self._restoring_members.pop(member.id, None)
+
+            # Отправляем приветствие сразу при входе, если:
+            # 1) На сервере вообще НЕ настроена роль верификации
+            # 2) ИЛИ участник УЖЕ верифицирован в БД и вернулся на сервер
+            verify_role_id = cfg.get("verificationRoleId")
+            verify_role_obj = member.guild.get_role(int(verify_role_id)) if (verify_role_id and str(verify_role_id).isdigit()) else None
+            is_already_verified = bool(profile and profile.get("isVerified"))
+
+            if not verify_role_obj or is_already_verified:
+                await send_welcome_card(member, cfg, extra_roles=restored_roles)
 
         embed = disnake.Embed(
             title="📥 Новый участник на сервере",
@@ -281,7 +293,6 @@ class Audit(commands.Cog):
                 restore_time = self._restoring_members.get(after.id)
                 is_suppressed = restore_time and (time.time() - restore_time) < 4.0
 
-                # Если это не принудительное снятие через /unverify, синхронизируем с БД
                 if not is_suppressed:
                     await api.update_user_roles_batch(
                         str(after.guild.id),
