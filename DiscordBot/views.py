@@ -5,12 +5,12 @@ from utils import parse_emoji, add_chunked_role_fields
 from config import P3_BLUE, UNIFIED_FOOTER
 
 class VerifyView(disnake.ui.View):
-    def __init__(self, button_label: str = "Инициализировать допуск", button_emoji: str = "🤖"):
+    def __init__(self, button_label: str = "Пройти верификацию", button_emoji: str = "✅"):
         super().__init__(timeout=None)
         self.add_item(disnake.ui.Button(
             label=button_label,
             style=disnake.ButtonStyle.success,
-            emoji=parse_emoji(button_emoji) or "🤖",
+            emoji=parse_emoji(button_emoji) or "✅",
             custom_id="persistent_verify_button"
         ))
 
@@ -31,7 +31,7 @@ class ConfirmResetView(disnake.ui.View):
         super().__init__(timeout=30)
         self.author_id = author_id
 
-    @disnake.ui.button(label="Да, сбросить", style=disnake.ButtonStyle.danger, emoji="⚠️")
+    @disnake.ui.button(label="Да, сбросить всё", style=disnake.ButtonStyle.danger, emoji="⚠️")
     async def confirm(self, button: disnake.ui.Button, inter: disnake.MessageInteraction):
         if inter.author.id != self.author_id:
             await inter.response.send_message("❌ Только автор команды может управлять этой панелью.", ephemeral=True)
@@ -51,7 +51,7 @@ class ConfirmResetView(disnake.ui.View):
 
         if await api.save_guild_config(reset_payload):
             await inter.edit_original_response(
-                content="♻️ Все настройки безопасности сервера полностью сброшены к начальным.",
+                content="♻️ Все настройки сервера полностью сброшены к начальным.",
                 embed=None,
                 view=None
             )
@@ -73,6 +73,48 @@ class SettingsDashboardView(disnake.ui.View):
     def __init__(self, author_id: int):
         super().__init__(timeout=180)
         self.author_id = author_id
+
+    @disnake.ui.select(
+        placeholder="🗑️ Отключить / очистить отдельный параметр...",
+        options=[
+            disnake.SelectOption(label="Отключить роль верификации", value="verificationRoleId", emoji="🛡️"),
+            disnake.SelectOption(label="Отключить канал приветствий", value="welcomeChannelId", emoji="👋"),
+            disnake.SelectOption(label="Отключить канал аудита (логов)", value="logChannelId", emoji="📜"),
+            disnake.SelectOption(label="Отключить приватные войсы", value="voiceGeneratorChannelId", emoji="🔊"),
+            disnake.SelectOption(label="Отключить канал-ловушку (Тишина)", value="trapChannelId", emoji="🤫"),
+            disnake.SelectOption(label="Сбросить текст шаблона приветствия", value="welcomeText", emoji="📝"),
+        ]
+    )
+    async def remove_single_config(self, select: disnake.ui.Select, inter: disnake.MessageInteraction):
+        if inter.author.id != self.author_id:
+            await inter.response.send_message("❌ Только автор команды может управлять этой панелью.", ephemeral=True)
+            return
+
+        await inter.response.defer(ephemeral=True)
+        guild_id = str(inter.guild_id)
+        cfg = await api.get_guild_config(guild_id) or {}
+        cfg["guildId"] = guild_id
+
+        choice = select.values[0]
+        labels_map = {
+            "verificationRoleId": "🛡️ Роль верификации отключена.",
+            "welcomeChannelId": "👋 Канал приветствий отключен.",
+            "logChannelId": "📜 Канал аудита (логов) отключен.",
+            "voiceGeneratorChannelId": "🔊 Создание приватных голосовых комнат отключено.",
+            "trapChannelId": "🤫 Канал-ловушка (Тишина) отключен.",
+            "welcomeText": "📝 Текст приветствия сброшен к стандартному."
+        }
+
+        if choice == "welcomeText":
+            cfg["welcomeTitle"] = None
+            cfg["welcomeDescription"] = None
+        else:
+            cfg[choice] = None
+
+        if await api.save_guild_config(cfg):
+            await inter.followup.send(f"✅ {labels_map.get(choice, 'Параметр сброшен.')} Вызовите `/settings`, чтобы обновить панель.", ephemeral=True)
+        else:
+            await inter.followup.send("❌ Не удалось сохранить настройки: API недоступен.", ephemeral=True)
 
     @disnake.ui.button(label="Список ролей в БД", style=disnake.ButtonStyle.primary, emoji="📋")
     async def view_roles(self, button: disnake.ui.Button, inter: disnake.MessageInteraction):
@@ -104,48 +146,6 @@ class SettingsDashboardView(disnake.ui.View):
 
         await inter.edit_original_response(embed=embed)
 
-    @disnake.ui.button(label="Отключить приватные войсы", style=disnake.ButtonStyle.secondary, emoji="🔇")
-    async def disable_voice_hub(self, button: disnake.ui.Button, inter: disnake.MessageInteraction):
-        if inter.author.id != self.author_id:
-            await inter.response.send_message("❌ Только автор команды может управлять этой панелью.", ephemeral=True)
-            return
-
-        await inter.response.defer()
-        guild_id = str(inter.guild_id)
-        cfg = await api.get_guild_config(guild_id) or {}
-        cfg["guildId"] = guild_id
-        cfg["voiceGeneratorChannelId"] = None
-
-        if await api.save_guild_config(cfg):
-            await inter.edit_original_response(
-                content="✅ Создание приватных голосовых комнат успешно отключено.",
-                embed=None,
-                view=None
-            )
-        else:
-            await inter.edit_original_response(content="❌ Не удалось сохранить настройки: API недоступен.")
-
-    @disnake.ui.button(label="Отключить ловушку", style=disnake.ButtonStyle.secondary, emoji="🤫")
-    async def disable_trap(self, button: disnake.ui.Button, inter: disnake.MessageInteraction):
-        if inter.author.id != self.author_id:
-            await inter.response.send_message("❌ Только автор команды может управлять этой панелью.", ephemeral=True)
-            return
-
-        await inter.response.defer()
-        guild_id = str(inter.guild_id)
-        cfg = await api.get_guild_config(guild_id) or {}
-        cfg["guildId"] = guild_id
-        cfg["trapChannelId"] = None
-
-        if await api.save_guild_config(cfg):
-            await inter.edit_original_response(
-                content="✅ Канал-тишина успешно отключен. Теперь писать в него безопасно.",
-                embed=None,
-                view=None
-            )
-        else:
-            await inter.edit_original_response(content="❌ Не удалось сохранить настройки: API недоступен.")
-
     @disnake.ui.button(label="Сбросить всё (Reset)", style=disnake.ButtonStyle.danger, emoji="♻️")
     async def full_reset(self, button: disnake.ui.Button, inter: disnake.MessageInteraction):
         if inter.author.id != self.author_id:
@@ -153,6 +153,6 @@ class SettingsDashboardView(disnake.ui.View):
             return
 
         await inter.response.edit_message(
-            content="⚠️ **Вы уверены?** Будут сброшены роль верификации, каналы приветствий, логов, приватных войсов и ловушка. Действие необратимо.",
+            content="⚠️ **Вы уверены?** Будут сброшены все каналы и настройки безопасности сервера. Действие необратимо.",
             view=ConfirmResetView(self.author_id)
         )

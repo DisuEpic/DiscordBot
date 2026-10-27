@@ -211,9 +211,6 @@ class Audit(commands.Cog):
                     except disnake.HTTPException:
                         self._restoring_members.pop(member.id, None)
 
-            # Отправляем приветствие сразу при входе, если:
-            # 1) На сервере вообще НЕ настроена роль верификации
-            # 2) ИЛИ участник УЖЕ верифицирован в БД и вернулся на сервер
             verify_role_id = cfg.get("verificationRoleId")
             verify_role_obj = member.guild.get_role(int(verify_role_id)) if (verify_role_id and str(verify_role_id).isdigit()) else None
             is_already_verified = bool(profile and profile.get("isVerified"))
@@ -322,6 +319,13 @@ class Audit(commands.Cog):
         if member.bot or before.channel == after.channel:
             return
 
+        cfg = await api.get_guild_config(str(member.guild.id))
+        gen_id_str = str(cfg.get("voiceGeneratorChannelId")) if cfg and cfg.get("voiceGeneratorChannelId") else None
+
+        # Игнорируем технический вход в канал «➕ Создать комнату», так как человека тут же перебросит
+        if after.channel and gen_id_str and str(after.channel.id) == gen_id_str:
+            return
+
         if before.channel is None and after.channel is not None:
             embed = disnake.Embed(
                 title="🔊 Подключение к голосовому каналу",
@@ -343,12 +347,20 @@ class Audit(commands.Cog):
             await send_log(member.guild, embed)
 
         elif before.channel is not None and after.channel is not None:
-            embed = disnake.Embed(
-                title="🔀 Смена голосового канала",
-                description=f"**Участник:** {member.mention} (`{member.id}`)\n**Из:** {before.channel.mention} ➔ **В:** {after.channel.mention}",
-                color=AIGIS_GOLD,
-                timestamp=disnake.utils.utcnow()
-            )
+            if gen_id_str and str(before.channel.id) == gen_id_str:
+                embed = disnake.Embed(
+                    title="🔊 Создана приватная комната",
+                    description=f"**Владелец:** {member.mention} (`{member.id}`)\n**Канал:** {after.channel.mention}",
+                    color=TACTICAL_GREEN,
+                    timestamp=disnake.utils.utcnow()
+                )
+            else:
+                embed = disnake.Embed(
+                    title="🔀 Смена голосового канала",
+                    description=f"**Участник:** {member.mention} (`{member.id}`)\n**Из:** {before.channel.mention} ➔ **В:** {after.channel.mention}",
+                    color=AIGIS_GOLD,
+                    timestamp=disnake.utils.utcnow()
+                )
             embed.set_footer(text=UNIFIED_FOOTER)
             await send_log(member.guild, embed)
 

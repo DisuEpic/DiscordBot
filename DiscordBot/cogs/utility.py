@@ -35,12 +35,30 @@ class Utility(commands.Cog):
 
         target_voice_hub = voice_hub_channel
         if create_voice_hub and not target_voice_hub:
-            try:
-                category = await inter.guild.create_category("🔊 Приватные комнаты")
-                target_voice_hub = await inter.guild.create_voice_channel("➕ Создать комнату", category=category)
-            except disnake.Forbidden:
-                await inter.edit_original_response(content="⚠️ У бота недостаточно прав для автоматического создания каналов.")
-                return
+            # 1. Проверяем, есть ли уже живой канал из БД на сервере
+            existing_hub_id = existing.get("voiceGeneratorChannelId")
+            if existing_hub_id and str(existing_hub_id).isdigit():
+                ch = inter.guild.get_channel(int(existing_hub_id))
+                if isinstance(ch, disnake.VoiceChannel):
+                    target_voice_hub = ch
+
+            # 2. Проверяем, нет ли уже канала с таким именем на сервере, чтобы не дублировать
+            if not target_voice_hub:
+                for v_ch in inter.guild.voice_channels:
+                    if v_ch.name == "➕ Создать комнату":
+                        target_voice_hub = v_ch
+                        break
+
+            # 3. Создаем только если его действительно еще нет
+            if not target_voice_hub:
+                try:
+                    category = disnake.utils.get(inter.guild.categories, name="🔊 Приватные комнаты")
+                    if not category:
+                        category = await inter.guild.create_category("🔊 Приватные комнаты")
+                    target_voice_hub = await inter.guild.create_voice_channel("➕ Создать комнату", category=category)
+                except disnake.Forbidden:
+                    await inter.edit_original_response(content="⚠️ У бота недостаточно прав для автоматического создания каналов.")
+                    return
 
         payload = {
             **existing,

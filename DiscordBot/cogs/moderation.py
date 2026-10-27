@@ -1,6 +1,7 @@
 import datetime
 import disnake
 from disnake.ext import commands
+from api import api
 from utils import check_moderation_target, send_log
 from config import GUILD_ONLY, AIGIS_GOLD, COMBAT_RED, TACTICAL_GREEN, UNIFIED_FOOTER
 
@@ -13,7 +14,6 @@ class Moderation(commands.Cog):
     async def lock_channel(self, inter: disnake.ApplicationCommandInteraction):
         await inter.response.defer(ephemeral=True)
         channel = inter.channel
-        from api import api
         guild_config = await api.get_guild_config(str(inter.guild_id)) or {}
         role_id = guild_config.get("verificationRoleId")
         target_role = (inter.guild.get_role(int(role_id)) if role_id else None) or inter.guild.default_role
@@ -24,10 +24,10 @@ class Moderation(commands.Cog):
             await inter.edit_original_response(content="⚠️ У бота недостаточно прав для изменения разрешений этого канала.")
             return
 
-        await inter.edit_original_response(content=f"🔒 Сектор {channel.mention} заблокирован! Участники не могут писать.")
+        await inter.edit_original_response(content=f"🔒 Канал {channel.mention} заблокирован! Участники не могут писать.")
         embed = disnake.Embed(
-            title="🔒 Сектор переведен в режим блокировки",
-            description=f"Канал {channel.mention} заблокирован оператором {inter.author.mention}.",
+            title="🔒 Канал заблокирован",
+            description=f"**Канал:** {channel.mention}\n**Модератор:** {inter.author.mention}",
             color=COMBAT_RED,
             timestamp=disnake.utils.utcnow()
         )
@@ -39,7 +39,6 @@ class Moderation(commands.Cog):
     async def unlock_channel(self, inter: disnake.ApplicationCommandInteraction):
         await inter.response.defer(ephemeral=True)
         channel = inter.channel
-        from api import api
         guild_config = await api.get_guild_config(str(inter.guild_id)) or {}
         role_id = guild_config.get("verificationRoleId")
         target_role = (inter.guild.get_role(int(role_id)) if role_id else None) or inter.guild.default_role
@@ -50,10 +49,10 @@ class Moderation(commands.Cog):
             await inter.edit_original_response(content="⚠️ У бота недостаточно прав для изменения разрешений этого канала.")
             return
 
-        await inter.edit_original_response(content=f"🔓 Сектор {channel.mention} разблокирован для общения.")
+        await inter.edit_original_response(content=f"🔓 Канал {channel.mention} разблокирован для общения.")
         embed = disnake.Embed(
-            title="🔓 Сектор разблокирован",
-            description=f"Канал {channel.mention} открыт оператором {inter.author.mention}.",
+            title="🔓 Канал разблокирован",
+            description=f"**Канал:** {channel.mention}\n**Модератор:** {inter.author.mention}",
             color=TACTICAL_GREEN,
             timestamp=disnake.utils.utcnow()
         )
@@ -153,7 +152,7 @@ class Moderation(commands.Cog):
             await inter.edit_original_response(content=f"🔨 Участник **{member.display_name}** успешно заблокирован на сервере.\nПричина: *{reason}*")
 
             log_embed = disnake.Embed(
-                title="🔨 Допуск аннулирован (Бан)",
+                title="🔨 Участник заблокирован (Бан)",
                 description=f"**Забанен:** {member.mention} (`{member.id}`)\n**Модератор:** {inter.author.mention}\n**Причина:** {reason}",
                 color=COMBAT_RED,
                 timestamp=disnake.utils.utcnow()
@@ -204,8 +203,8 @@ class Moderation(commands.Cog):
         try:
             deleted = await inter.channel.purge(limit=amount, after=cutoff)
             embed = disnake.Embed(
-                title="🧹 Очистка сектора завершена",
-                description=f"В секторе {inter.channel.mention} удалено сообщений: **{len(deleted)}** шт.\n*(Сообщения старше 14 дней не затрагиваются)*",
+                title="🧹 Очистка чата завершена",
+                description=f"В канале {inter.channel.mention} удалено сообщений: **{len(deleted)}** шт.\n*(Сообщения старше 14 дней не затрагиваются)*",
                 color=AIGIS_GOLD
             )
             embed.set_footer(text=UNIFIED_FOOTER)
