@@ -51,10 +51,6 @@ async def send_welcome_card(
         description=final_desc,
         color=TACTICAL_GREEN
     )
-    if extra_roles:
-        roles_mentions = ", ".join(r.mention for r in extra_roles)
-        welcome_embed.add_field(name="♻️ Восстановлены роли:", value=roles_mentions[:1024], inline=False)
-
     welcome_embed.set_thumbnail(url=member.display_avatar.url)
     welcome_embed.set_footer(text=UNIFIED_FOOTER)
 
