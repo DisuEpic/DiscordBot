@@ -104,6 +104,27 @@ class SettingsDashboardView(disnake.ui.View):
 
         await inter.edit_original_response(embed=embed)
 
+    @disnake.ui.button(label="Отключить приватные войсы", style=disnake.ButtonStyle.secondary, emoji="🔇")
+    async def disable_voice_hub(self, button: disnake.ui.Button, inter: disnake.MessageInteraction):
+        if inter.author.id != self.author_id:
+            await inter.response.send_message("❌ Только автор команды может управлять этой панелью.", ephemeral=True)
+            return
+
+        await inter.response.defer()
+        guild_id = str(inter.guild_id)
+        cfg = await api.get_guild_config(guild_id) or {}
+        cfg["guildId"] = guild_id
+        cfg["voiceGeneratorChannelId"] = None
+
+        if await api.save_guild_config(cfg):
+            await inter.edit_original_response(
+                content="✅ Создание приватных голосовых комнат успешно отключено.",
+                embed=None,
+                view=None
+            )
+        else:
+            await inter.edit_original_response(content="❌ Не удалось сохранить настройки: API недоступен.")
+
     @disnake.ui.button(label="Отключить ловушку", style=disnake.ButtonStyle.secondary, emoji="🤫")
     async def disable_trap(self, button: disnake.ui.Button, inter: disnake.MessageInteraction):
         if inter.author.id != self.author_id:

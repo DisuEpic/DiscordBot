@@ -13,49 +13,76 @@ class Utility(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    @commands.slash_command(contexts=GUILD_ONLY, name="setup_config", description="Настроить каналы и роль верификации")
+    @commands.slash_command(
+        contexts=GUILD_ONLY,
+        name="setup_config",
+        description="Единая настройка каналов, верификации, ловушки и приватных войсов"
+    )
     @commands.default_member_permissions(administrator=True)
     async def setup_config(
         self,
         inter: disnake.ApplicationCommandInteraction,
-        verification_role: Optional[disnake.Role] = None,
-        welcome_channel: Optional[disnake.TextChannel] = None,
-        log_channel: Optional[disnake.TextChannel] = None
+        verification_role: Optional[disnake.Role] = commands.Param(default=None, description="Роль, выдаваемая после верификации"),
+        welcome_channel: Optional[disnake.TextChannel] = commands.Param(default=None, description="Канал для карточек приветствия"),
+        log_channel: Optional[disnake.TextChannel] = commands.Param(default=None, description="Канал для логов (аудита) сервера"),
+        trap_channel: Optional[disnake.TextChannel] = commands.Param(default=None, description="Канал-ловушка (кик за любое сообщение)"),
+        voice_hub_channel: Optional[disnake.VoiceChannel] = commands.Param(default=None, description="Голосовой канал «➕ Создать комнату»"),
+        create_voice_hub: bool = commands.Param(default=False, description="Автоматически создать категорию и канал для приватных войсов?")
     ):
         await inter.response.defer(ephemeral=True)
         guild_id = str(inter.guild_id)
         existing = await api.get_guild_config(guild_id) or {}
+
+        target_voice_hub = voice_hub_channel
+        if create_voice_hub and not target_voice_hub:
+            try:
+                category = await inter.guild.create_category("🔊 Приватные комнаты")
+                target_voice_hub = await inter.guild.create_voice_channel("➕ Создать комнату", category=category)
+            except disnake.Forbidden:
+                await inter.edit_original_response(content="⚠️ У бота недостаточно прав для автоматического создания каналов.")
+                return
+
         payload = {
             **existing,
             "guildId": guild_id,
             "verificationRoleId": str(verification_role.id) if verification_role else existing.get("verificationRoleId"),
             "welcomeChannelId": str(welcome_channel.id) if welcome_channel else existing.get("welcomeChannelId"),
             "logChannelId": str(log_channel.id) if log_channel else existing.get("logChannelId"),
+            "trapChannelId": str(trap_channel.id) if trap_channel else existing.get("trapChannelId"),
+            "voiceGeneratorChannelId": str(target_voice_hub.id) if target_voice_hub else existing.get("voiceGeneratorChannelId"),
         }
 
         if await api.save_guild_config(payload):
             embed = disnake.Embed(title="⚙️ Конфигурация сервера успешно сохранена!", color=TACTICAL_GREEN)
-            embed.add_field(name="Роль верификации", value=f"<@&{payload['verificationRoleId']}>" if payload.get("verificationRoleId") else "Не задана", inline=False)
-            embed.add_field(name="Канал приветствий", value=f"<#{payload['welcomeChannelId']}>" if payload.get("welcomeChannelId") else "Не задан", inline=False)
-            embed.add_field(name="Канал аудита (логов)", value=f"<#{payload['logChannelId']}>" if payload.get("logChannelId") else "Не задан", inline=False)
+            embed.add_field(
+                name="🛡️ Роль верификации",
+                value=f"<@&{payload['verificationRoleId']}>" if payload.get("verificationRoleId") else "Не задана",
+                inline=False
+            )
+            embed.add_field(
+                name="👋 Канал приветствий",
+                value=f"<#{payload['welcomeChannelId']}>" if payload.get("welcomeChannelId") else "Не задан",
+                inline=False
+            )
+            embed.add_field(
+                name="📜 Канал аудита (логов)",
+                value=f"<#{payload['logChannelId']}>" if payload.get("logChannelId") else "Не задан",
+                inline=False
+            )
+            embed.add_field(
+                name="🔊 Создание приватных войсов",
+                value=f"<#{payload['voiceGeneratorChannelId']}>" if payload.get("voiceGeneratorChannelId") else "Не задан",
+                inline=False
+            )
+            embed.add_field(
+                name="🤫 Канал-ловушка (Тишина)",
+                value=f"<#{payload['trapChannelId']}>" if payload.get("trapChannelId") else "Не задан",
+                inline=False
+            )
             embed.set_footer(text=UNIFIED_FOOTER)
             await inter.edit_original_response(embed=embed)
         else:
-            await inter.edit_original_response(content="❌ Ошибка при сохранении в API бэкенда.")
-
-    @commands.slash_command(contexts=GUILD_ONLY, name="setup_trap_channel", description="Назначить канал тишины (кик за сообщение)")
-    @commands.default_member_permissions(administrator=True)
-    async def setup_trap_channel(self, inter: disnake.ApplicationCommandInteraction, channel: disnake.TextChannel):
-        await inter.response.defer(ephemeral=True)
-        guild_id = str(inter.guild_id)
-        existing = await api.get_guild_config(guild_id) or {}
-        existing["guildId"] = guild_id
-        existing["trapChannelId"] = str(channel.id)
-
-        if await api.save_guild_config(existing):
-            await inter.edit_original_response(content=f"🤫 Канал тишины установлен: {channel.mention}. Любое сообщение удаляется, а автор исключается.")
-        else:
-            await inter.edit_original_response(content="❌ Ошибка сохранения параметров.")
+            await inter.edit_original_response(content="❌ Ошибка при сохранении конфигурации в БД.")
 
     @commands.slash_command(contexts=GUILD_ONLY, name="settings", description="Посмотреть текущие настройки Aigis и управлять ими")
     @commands.default_member_permissions(administrator=True)

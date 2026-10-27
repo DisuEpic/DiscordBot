@@ -1,8 +1,8 @@
 import disnake
 from disnake.ext import commands
-from typing import Dict, Set, Optional
+from typing import Dict, Set
 from api import api
-from config import GUILD_ONLY, P3_BLUE, UNIFIED_FOOTER
+from config import P3_BLUE, UNIFIED_FOOTER
 
 class RenameVoiceModal(disnake.ui.Modal):
     def __init__(self, channel: disnake.VoiceChannel):
@@ -126,41 +126,6 @@ class VoiceHub(commands.Cog):
         self.bot = bot
         self.temp_channels: Dict[int, int] = {}
         self.deleted_temp_ids: Set[int] = set()
-
-    @commands.slash_command(
-        contexts=GUILD_ONLY,
-        name="setup_voice_hub",
-        description="Настроить канал создания приватных голосовых комнат («➕ Создать комнату»)"
-    )
-    @commands.default_member_permissions(administrator=True)
-    async def setup_voice_hub(
-        self,
-        inter: disnake.ApplicationCommandInteraction,
-        existing_channel: Optional[disnake.VoiceChannel] = commands.Param(
-            default=None, description="Выберите готовый голосовой канал (или оставьте пустым для авто-создания)"
-        )
-    ):
-        await inter.response.defer(ephemeral=True)
-        guild_id = str(inter.guild_id)
-        cfg = await api.get_guild_config(guild_id) or {"guildId": guild_id}
-        cfg["guildId"] = guild_id
-
-        target_channel = existing_channel
-        if not target_channel:
-            try:
-                category = await inter.guild.create_category("🔊 Приватные комнаты")
-                target_channel = await inter.guild.create_voice_channel("➕ Создать комнату", category=category)
-            except disnake.Forbidden:
-                await inter.edit_original_response(content="⚠️ У бота нет прав на создание каналов!")
-                return
-
-        cfg["voiceGeneratorChannelId"] = str(target_channel.id)
-        if await api.save_guild_config(cfg):
-            await inter.edit_original_response(
-                content=f"✅ Канал создания приватных комнат настроен: {target_channel.mention}!\nПри входе в него бот автоматически создаст личный голосовой канал."
-            )
-        else:
-            await inter.edit_original_response(content="❌ Не удалось сохранить настройки в БД.")
 
     @commands.Cog.listener()
     async def on_voice_state_update(self, member: disnake.Member, before: disnake.VoiceState, after: disnake.VoiceState):
