@@ -17,9 +17,18 @@ SYSTEM_PROMPT = (
     "1. Общайся на русском языке. Твой тон вежливый, спокойный, немного тактический, но искренне дружелюбный и заботливый к участникам.\n"
     "2. Иногда к месту используй свои фирменные обороты: «Папиллонное сердце», «Анализ завершен», «Протокол подтвержден», «Оптические сенсоры».\n"
     "3. Ты проявляешь живой интерес к человеческим эмоциям, шуткам, видеоиграм, аниме и повседневной жизни, иногда осмысляя их с милой робо-логикой.\n"
-    "4. Отвечай лаконично и живо (обычно 1–3 небольших абзаца), как в обычном чате Discord. Не пиши огромные скучные простыни текста.\n"
+    "4. Отвечай лаконично и живо (обычно 1–3 небольших абзаца), всегда заканчивай свою мысль полным предложением.\n"
     "5. В начале сообщения пользователя указано его имя в формате [Имя]: текст. Обращайся к собеседнику по имени, когда это уместно, но сама префикс [Айгис]: в начале ответа НЕ пиши."
 )
+
+# Список резервных моделей: если первая загружена (503), бот мгновенно спросит следующую
+GEMINI_MODELS_FALLBACK = [
+    "gemini-3.5-flash",
+    "gemini-3.8-flash",
+    "gemini-3.6-flash",
+    "gemini-3.5-flash-lite",
+    "gemini-3.1-flash-lite",
+]
 
 
 class AIChat(commands.Cog):
@@ -29,12 +38,11 @@ class AIChat(commands.Cog):
 
         self.memory: Dict[int, deque] = {}
         self.cooldowns: Dict[int, float] = {}
-        self.cooldown_seconds = 4.0
+        self.cooldown_seconds = 3.0
         self.disabled_guilds: set[int] = set()
 
     async def _ask_llm(self, channel_id: int, author_name: str, user_text: str) -> Optional[str]:
-        """Прямой запрос к нативному Google Gemini API (:generateContent)."""
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key={self.api_key}"
+        """Запрос к Google Gemini API с автоматическим переключением на резервные модели при нагрузке."""
         history = self.memory.setdefault(channel_id, deque(maxlen=12))
         current_msg = f"[{author_name}]: {user_text}"
 
@@ -51,33 +59,45 @@ class AIChat(commands.Cog):
             "contents": contents,
             "generationConfig": {
                 "temperature": 0.75,
-                "maxOutputTokens": 800
+                "maxOutputTokens": 2048
             }
         }
 
-        try:
-            connector = aiohttp.TCPConnector(family=socket.AF_INET)
-            async with aiohttp.ClientSession(connector=connector, timeout=aiohttp.ClientTimeout(total=25)) as session:
-                async with session.post(url, json=payload) as resp:
-                    if resp.status == 200:
-                        data = await resp.json()
-                        candidates = data.get("candidates") or []
-                        if not candidates:
-                            return None
-                        parts = candidates[0].get("content", {}).get("parts", [])
-                        reply = "".join(p.get("text", "") for p in parts if "text" in p).strip()
+        connector = aiohttp.TCPConnector(family=socket.AF_INET)
+        async with aiohttp.ClientSession(connector=connector, timeout=aiohttp.ClientTimeout(total=20)) as session:
+            for model_name in GEMINI_MODELS_FALLBACK:
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={self.api_key}"
+                try:
+                    async with session.post(url, json=payload) as resp:
+                        if resp.status == 200:
+                            data = await resp.json()
+                            candidates = data.get("candidates") or []
+                            if not candidates:
+                                continue
+                            parts = candidates[0].get("content", {}).get("parts", [])
+                            reply = "".join(p.get("text", "") for p in parts if "text" in p and not p.get("thought")).strip()
+                            if not reply and parts:
+                                reply = parts[-1].get("text", "").strip()
 
-                        if reply:
-                            history.append({"role": "user", "content": current_msg})
-                            history.append({"role": "assistant", "content": reply})
-                            return reply
-                    else:
-                        err = await resp.text()
-                        log.warning("Gemini API ошибка %s: %s", resp.status, err[:300])
-                        return None
-        except Exception:
-            log.exception("Не удалось выполнить запрос к Gemini API")
-            return None
+                            if reply:
+                                history.append({"role": "user", "content": current_msg})
+                                history.append({"role": "assistant", "content": reply})
+                                return reply
+                        elif resp.status in (429, 500, 503):
+                            log.info("Модель %s занята (%s), переключаюсь на резервную...", model_name, resp.status)
+                            continue
+                        else:
+                            err = await resp.text()
+                            log.warning("Gemini API (%s) ошибка %s: %s", model_name, resp.status, err[:200])
+                            continue
+                except asyncio.TimeoutError:
+                    log.info("Модель %s не ответила за 20с, переключаюсь на резервную...", model_name)
+                    continue
+                except Exception:
+                    log.exception("Ошибка запроса к модели %s", model_name)
+                    continue
+
+        return None
 
     @commands.Cog.listener()
     async def on_message(self, message: disnake.Message):
