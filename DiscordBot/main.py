@@ -14,7 +14,7 @@ class AigisBot(commands.Bot):
         await api.close()
         await super().close()
 
-bot = AigisBot(command_prefix=commands.when_mentioned, intents=intents)
+bot = commands.InteractionBot(intents=intents)
 
 @bot.event
 async def on_ready():
