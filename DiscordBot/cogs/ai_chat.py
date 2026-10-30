@@ -1,5 +1,6 @@
 import os
 import time
+import socket
 import aiohttp
 import disnake
 from disnake.ext import commands
@@ -24,15 +25,11 @@ SYSTEM_PROMPT = (
 class AIChat(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        # Берем только ключ нейросети из .env
         self.api_key = (os.getenv("LLM_API_KEY") or "").strip()
 
-        # Память диалогов по каналам: {channel_id: deque([...])}
         self.memory: Dict[int, deque] = {}
-        # Защита от спама (кулдаун 4 сек на участника): {user_id: timestamp}
         self.cooldowns: Dict[int, float] = {}
         self.cooldown_seconds = 4.0
-        # Список серверов, где админ временно выключил ИИ командой /ai_toggle
         self.disabled_guilds: set[int] = set()
 
     def _get_provider_config(self) -> tuple[str, str]:
@@ -51,7 +48,6 @@ class AIChat(commands.Cog):
         url, model_name = self._get_provider_config()
         history = self.memory.setdefault(channel_id, deque(maxlen=12))
 
-        # Собираем цепочку: Системный промпт + История канала + Текущий вопрос
         messages_payload: List[Dict[str, str]] = [
             {"role": "system", "content": SYSTEM_PROMPT},
             *list(history),
@@ -69,17 +65,17 @@ class AIChat(commands.Cog):
             "temperature": 0.75,
             "max_tokens": 500
         }
-        # Ускоряем ответ Gemini, отключая долгое фоновое размышление
         if model_name.startswith("gemini"):
             payload["reasoning_effort"] = "none"
 
         try:
-            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=40)) as session:
+            # Принудительно используем IPv4 (AF_INET), чтобы Docker не зависал на IPv6 к Google API
+            connector = aiohttp.TCPConnector(family=socket.AF_INET)
+            async with aiohttp.ClientSession(connector=connector, timeout=aiohttp.ClientTimeout(total=30)) as session:
                 async with session.post(url, json=payload, headers=headers) as resp:
                     if resp.status == 200:
                         data = await resp.json()
                         reply = data["choices"][0]["message"]["content"].strip()
-                        # Сохраняем вопрос и ответ в память канала
                         history.append({"role": "user", "content": f"[{author_name}]: {user_text}"})
                         history.append({"role": "assistant", "content": reply})
                         return reply
@@ -93,19 +89,16 @@ class AIChat(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message(self, message: disnake.Message):
-        # 1. Игнорируем ботов, ЛС и случаи, когда ключ не задан в .env
         if message.author.bot or not message.guild or not self.api_key:
             return
 
         if message.guild.id in self.disabled_guilds:
             return
 
-        # 2. Не отвечаем в канале-ловушке
         cfg = await api.get_guild_config(str(message.guild.id))
         if cfg and cfg.get("trapChannelId") and str(message.channel.id) == str(cfg["trapChannelId"]):
             return
 
-        # 3. Проверяем триггер: тегнули @Aigis ИЛИ ответили (Reply) на её сообщение
         is_mentioned = self.bot.user in message.mentions
         is_reply_to_bot = False
 
@@ -122,25 +115,21 @@ class AIChat(commands.Cog):
         if not (is_mentioned or is_reply_to_bot):
             return
 
-        # 4. Проверяем кулдаун (не чаще 1 раза в 4 секунды от одного человека)
         now = time.time()
         last_used = self.cooldowns.get(message.author.id, 0.0)
         if now - last_used < self.cooldown_seconds:
             return
         self.cooldowns[message.author.id] = now
 
-        # 5. Вырезаем само упоминание <@ID_бота> из текста сообщения
         clean_text = message.content
         for mention_str in (f"<@{self.bot.user.id}>", f"<@!{self.bot.user.id}>"):
             clean_text = clean_text.replace(mention_str, "")
         clean_text = clean_text.strip()
 
-        # Если человек просто пинганул бота пустым сообщением "@Aigis"
         if not clean_text:
             await message.reply("🤖 Оптические сенсоры активны. Я на связи, чем могу помочь?", mention_author=False)
             return
 
-        # 6. Включаем анимацию "Aigis печатает..." и запрашиваем ответ у ИИ
         async with message.channel.typing():
             reply_text = await self._ask_llm(
                 channel_id=message.channel.id,
