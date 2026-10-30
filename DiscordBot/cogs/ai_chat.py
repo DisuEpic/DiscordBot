@@ -40,7 +40,7 @@ class AIChat(commands.Cog):
         """Определяет по началу ключа, какой сервис используется: Google Gemini или Groq."""
         if self.api_key.startswith(("AIza", "AQ.")):
             url = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
-            default_model = "gemini-3.0-flash"
+            default_model = "gemini-3.8-flash"
         elif self.api_key.startswith("gsk_"):
             url = "https://api.groq.com/openai/v1/chat/completions"
             default_model = "llama-3.3-70b-versatile"
