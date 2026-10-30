@@ -24,9 +24,8 @@ SYSTEM_PROMPT = (
 class AIChat(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        # Берем ключ нейросети из переменных окружения (.env)
+        # Берем только ключ нейросети из .env
         self.api_key = (os.getenv("LLM_API_KEY") or "").strip()
-        self.custom_model = (os.getenv("LLM_MODEL") or "").strip()
 
         # Память диалогов по каналам: {channel_id: deque([...])}
         self.memory: Dict[int, deque] = {}
@@ -40,15 +39,12 @@ class AIChat(commands.Cog):
         """Определяет по началу ключа, какой сервис используется: Google Gemini или Groq."""
         if self.api_key.startswith(("AIza", "AQ.")):
             url = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
-            default_model = "gemini-3.8-flash"
-        elif self.api_key.startswith("gsk_"):
-            url = "https://api.groq.com/openai/v1/chat/completions"
-            default_model = "llama-3.3-70b-versatile"
+            model_name = "gemini-3.8-flash"
         else:
-            url = os.getenv("LLM_BASE_URL") or "https://openrouter.ai/api/v1/chat/completions"
-            default_model = "deepseek/deepseek-chat"
+            url = "https://api.groq.com/openai/v1/chat/completions"
+            model_name = "llama-3.3-70b-versatile"
 
-        return url, (self.custom_model or default_model)
+        return url, model_name
 
     async def _ask_llm(self, channel_id: int, author_name: str, user_text: str) -> Optional[str]:
         """Отправляет историю диалога и новое сообщение в нейросеть и возвращает ответ."""
@@ -73,9 +69,12 @@ class AIChat(commands.Cog):
             "temperature": 0.75,
             "max_tokens": 500
         }
+        # Ускоряем ответ Gemini, отключая долгое фоновое размышление
+        if model_name.startswith("gemini"):
+            payload["reasoning_effort"] = "none"
 
         try:
-            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=15)) as session:
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=40)) as session:
                 async with session.post(url, json=payload, headers=headers) as resp:
                     if resp.status == 200:
                         data = await resp.json()
@@ -136,7 +135,7 @@ class AIChat(commands.Cog):
             clean_text = clean_text.replace(mention_str, "")
         clean_text = clean_text.strip()
 
-        # Если человека просто пинганул бота пустым сообщением "@Aigis"
+        # Если человек просто пинганул бота пустым сообщением "@Aigis"
         if not clean_text:
             await message.reply("🤖 Оптические сенсоры активны. Я на связи, чем могу помочь?", mention_author=False)
             return
