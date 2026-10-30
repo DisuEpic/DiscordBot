@@ -1,15 +1,15 @@
 import os
 import time
 import socket
+import asyncio
 import aiohttp
 import disnake
 from disnake.ext import commands
 from collections import deque
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 from api import api
 from config import GUILD_ONLY, log
 
-# Инструкция личности для нейросети (Характер Aigis)
 SYSTEM_PROMPT = (
     "Ты — Айгис (Aigis), автономный боевой андроид-гиноид 7-го поколения из вселенной Persona 3. "
     "Сейчас ты являешься главным защитным модулем и талисманом Discord-сервера Night Summer. "
@@ -32,59 +32,51 @@ class AIChat(commands.Cog):
         self.cooldown_seconds = 4.0
         self.disabled_guilds: set[int] = set()
 
-    def _get_provider_config(self) -> tuple[str, str]:
-        """Определяет по началу ключа, какой сервис используется: Google Gemini или Groq."""
-        if self.api_key.startswith(("AIza", "AQ.")):
-            url = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
-            model_name = "gemini-3.8-flash"
-        else:
-            url = "https://api.groq.com/openai/v1/chat/completions"
-            model_name = "llama-3.3-70b-versatile"
-
-        return url, model_name
-
     async def _ask_llm(self, channel_id: int, author_name: str, user_text: str) -> Optional[str]:
-        """Отправляет историю диалога и новое сообщение в нейросеть и возвращает ответ."""
-        url, model_name = self._get_provider_config()
+        """Прямой запрос к нативному Google Gemini API (:generateContent)."""
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key={self.api_key}"
         history = self.memory.setdefault(channel_id, deque(maxlen=12))
+        current_msg = f"[{author_name}]: {user_text}"
 
-        messages_payload: List[Dict[str, str]] = [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            *list(history),
-            {"role": "user", "content": f"[{author_name}]: {user_text}"}
-        ]
-
-        headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json"
-        }
+        contents = []
+        for msg in history:
+            role = "model" if msg["role"] == "assistant" else "user"
+            contents.append({"role": role, "parts": [{"text": msg["content"]}]})
+        contents.append({"role": "user", "parts": [{"text": current_msg}]})
 
         payload = {
-            "model": model_name,
-            "messages": messages_payload,
-            "temperature": 0.75,
-            "max_tokens": 500
+            "systemInstruction": {
+                "parts": [{"text": SYSTEM_PROMPT}]
+            },
+            "contents": contents,
+            "generationConfig": {
+                "temperature": 0.75,
+                "maxOutputTokens": 800
+            }
         }
-        if model_name.startswith("gemini"):
-            payload["reasoning_effort"] = "none"
 
         try:
-            # Принудительно используем IPv4 (AF_INET), чтобы Docker не зависал на IPv6 к Google API
             connector = aiohttp.TCPConnector(family=socket.AF_INET)
-            async with aiohttp.ClientSession(connector=connector, timeout=aiohttp.ClientTimeout(total=30)) as session:
-                async with session.post(url, json=payload, headers=headers) as resp:
+            async with aiohttp.ClientSession(connector=connector, timeout=aiohttp.ClientTimeout(total=25)) as session:
+                async with session.post(url, json=payload) as resp:
                     if resp.status == 200:
                         data = await resp.json()
-                        reply = data["choices"][0]["message"]["content"].strip()
-                        history.append({"role": "user", "content": f"[{author_name}]: {user_text}"})
-                        history.append({"role": "assistant", "content": reply})
-                        return reply
+                        candidates = data.get("candidates") or []
+                        if not candidates:
+                            return None
+                        parts = candidates[0].get("content", {}).get("parts", [])
+                        reply = "".join(p.get("text", "") for p in parts if "text" in p).strip()
+
+                        if reply:
+                            history.append({"role": "user", "content": current_msg})
+                            history.append({"role": "assistant", "content": reply})
+                            return reply
                     else:
-                        err_text = await resp.text()
-                        log.warning("LLM API ошибка %s: %s", resp.status, err_text[:300])
+                        err = await resp.text()
+                        log.warning("Gemini API ошибка %s: %s", resp.status, err[:300])
                         return None
         except Exception:
-            log.exception("Не удалось выполнить запрос к LLM API")
+            log.exception("Не удалось выполнить запрос к Gemini API")
             return None
 
     @commands.Cog.listener()
