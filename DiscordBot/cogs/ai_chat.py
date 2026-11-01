@@ -218,8 +218,8 @@ class AIChat(commands.Cog):
             target_attachment = ref_msg.attachments[0]
 
         # Если ответили на чужое сообщение и позвали @Aigis — добавляем текст того сообщения в контекст!
-        if ref_msg and ref_msg.author.id != self.bot.user.id and ref_msg.content:
-            quoted_text = ref_msg.content[:400]
+        if ref_msg and ref_msg.content:
+            quoted_text = ref_msg.content[:500]
             clean_text = f"(В ответ на сообщение от {ref_msg.author.display_name}: «{quoted_text}») {clean_text}".strip()
 
         if not clean_text and not target_attachment:
