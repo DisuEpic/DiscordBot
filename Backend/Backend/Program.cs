@@ -39,10 +39,35 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-if (app.Configuration.GetValue("AutoMigrate", true))
+// Безопасная инициализация и обновление схемы БД при старте
+using (var scope = app.Services.CreateScope())
 {
-    using var scope = app.Services.CreateScope();
-    scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.Migrate();
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    try
+    {
+        if (app.Configuration.GetValue("AutoMigrate", true))
+        {
+            db.Database.Migrate();
+        }
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogWarning(ex, "Колонки уже существуют. Применяем безопасную синхронизацию схемы.");
+    }
+
+    try
+    {
+        db.Database.ExecuteSqlRaw("""
+            ALTER TABLE "ServerConfigs" ADD COLUMN IF NOT EXISTS "WelcomeTitle" text;
+            ALTER TABLE "ServerConfigs" ADD COLUMN IF NOT EXISTS "WelcomeDescription" text;
+            ALTER TABLE "ServerConfigs" ADD COLUMN IF NOT EXISTS "VoiceGeneratorChannelId" character varying(32);
+            ALTER TABLE "ServerConfigs" ADD COLUMN IF NOT EXISTS "VoiceRoomTemplate" character varying(64);
+        """);
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogError(ex, "Ошибка при проверке дополнительных колонок БД.");
+    }
 }
 
 app.UseMiddleware<ApiKeyMiddleware>();

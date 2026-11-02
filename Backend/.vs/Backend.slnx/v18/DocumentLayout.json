@@ -3,6 +3,10 @@
   "WorkspaceRootPath": "C:\\Users\\theep\\OneDrive\\\u0420\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\Aigis-project\\Backend\\",
   "Documents": [
     {
+      "AbsoluteMoniker": "D:0:0:{A83F252A-7CD7-33CC-82AF-F3645C4A8C9B}|Backend\\DiscordBot_API.csproj|c:\\users\\theep\\onedrive\\\u0440\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\aigis-project\\backend\\backend\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{A83F252A-7CD7-33CC-82AF-F3645C4A8C9B}|Backend\\DiscordBot_API.csproj|solutionrelative:backend\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
       "AbsoluteMoniker": "D:0:0:{A83F252A-7CD7-33CC-82AF-F3645C4A8C9B}|Backend\\DiscordBot_API.csproj|c:\\users\\theep\\onedrive\\\u0440\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\aigis-project\\backend\\backend\\migrations\\20261102092954_addvoiceroomtemplate.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{A83F252A-7CD7-33CC-82AF-F3645C4A8C9B}|Backend\\DiscordBot_API.csproj|solutionrelative:backend\\migrations\\20261102092954_addvoiceroomtemplate.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
@@ -60,8 +64,21 @@
         },
         {
           "DockedWidth": 30,
-          "SelectedChildIndex": 2,
+          "SelectedChildIndex": 0,
           "Children": [
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "Program.cs",
+              "DocumentMoniker": "C:\\Users\\theep\\OneDrive\\\u0420\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\Aigis-project\\Backend\\Backend\\Program.cs",
+              "RelativeDocumentMoniker": "Backend\\Program.cs",
+              "ToolTip": "C:\\Users\\theep\\OneDrive\\\u0420\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\Aigis-project\\Backend\\Backend\\Program.cs",
+              "RelativeToolTip": "Backend\\Program.cs",
+              "ViewState": "AgIAAD4AAAAAAAAAAAAwwFAAAAAKAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-11-02T10:24:50.695Z",
+              "EditorCaption": ""
+            },
             {
               "$type": "Bookmark",
               "Name": "ST:128:0:{116d2292-e37d-41cd-a077-ebacac4c8cc4}"
@@ -69,32 +86,19 @@
             {
               "$type": "Document",
               "DocumentIndex": 1,
-              "Title": "20261026145710_AddWelcomeAndVoiceConfig.cs",
-              "DocumentMoniker": "C:\\Users\\theep\\OneDrive\\\u0420\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\Aigis-project\\Backend\\Backend\\Migrations\\20261026145710_AddWelcomeAndVoiceConfig.cs",
-              "RelativeDocumentMoniker": "Backend\\Migrations\\20261026145710_AddWelcomeAndVoiceConfig.cs",
-              "ToolTip": "C:\\Users\\theep\\OneDrive\\\u0420\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\Aigis-project\\Backend\\Backend\\Migrations\\20261026145710_AddWelcomeAndVoiceConfig.cs",
-              "RelativeToolTip": "Backend\\Migrations\\20261026145710_AddWelcomeAndVoiceConfig.cs",
-              "ViewState": "AgIAAAgAAAAAAAAAAAAQwAAAAAAAAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-11-02T09:30:12.467Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 0,
               "Title": "20261102092954_AddVoiceRoomTemplate.cs",
               "DocumentMoniker": "C:\\Users\\theep\\OneDrive\\\u0420\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\Aigis-project\\Backend\\Backend\\Migrations\\20261102092954_AddVoiceRoomTemplate.cs",
               "RelativeDocumentMoniker": "Backend\\Migrations\\20261102092954_AddVoiceRoomTemplate.cs",
               "ToolTip": "C:\\Users\\theep\\OneDrive\\\u0420\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\Aigis-project\\Backend\\Backend\\Migrations\\20261102092954_AddVoiceRoomTemplate.cs",
               "RelativeToolTip": "Backend\\Migrations\\20261102092954_AddVoiceRoomTemplate.cs",
-              "ViewState": "AgIAADoAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "ViewState": "AgIAABYAAAAAAAAAAAAqwAAAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2026-11-02T09:30:07.167Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 5,
+              "DocumentIndex": 6,
               "Title": "RolesController.cs",
               "DocumentMoniker": "C:\\Users\\theep\\OneDrive\\\u0420\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\Aigis-project\\Backend\\Backend\\Controllers\\RolesController.cs",
               "RelativeDocumentMoniker": "Backend\\Controllers\\RolesController.cs",
@@ -102,12 +106,11 @@
               "RelativeToolTip": "Backend\\Controllers\\RolesController.cs",
               "ViewState": "AgIAAFQAAAAAAAAAAAAmwAAAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-10-26T15:26:01.723Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-10-26T15:26:01.723Z"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 7,
+              "DocumentIndex": 8,
               "Title": "Snowflake.cs",
               "DocumentMoniker": "C:\\Users\\theep\\OneDrive\\\u0420\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\Aigis-project\\Backend\\Backend\\Helpers\\Snowflake.cs",
               "RelativeDocumentMoniker": "Backend\\Helpers\\Snowflake.cs",
@@ -119,7 +122,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 3,
+              "DocumentIndex": 4,
               "Title": "DTOs.cs",
               "DocumentMoniker": "C:\\Users\\theep\\OneDrive\\\u0420\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\Aigis-project\\Backend\\Backend\\DTO\\DTOs.cs",
               "RelativeDocumentMoniker": "Backend\\DTO\\DTOs.cs",
@@ -127,12 +130,11 @@
               "RelativeToolTip": "Backend\\DTO\\DTOs.cs",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAAA4AAAAkAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-10-26T14:29:39.599Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-10-26T14:29:39.599Z"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 4,
+              "DocumentIndex": 5,
               "Title": "Models.cs",
               "DocumentMoniker": "C:\\Users\\theep\\OneDrive\\\u0420\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\Aigis-project\\Backend\\Backend\\Models.cs",
               "RelativeDocumentMoniker": "Backend\\Models.cs",
@@ -140,12 +142,11 @@
               "RelativeToolTip": "Backend\\Models.cs",
               "ViewState": "AgIAAAcAAAAAAAAAAAA1wBkAAAAyAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-10-22T14:57:20.698Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-10-22T14:57:20.698Z"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 2,
+              "DocumentIndex": 3,
               "Title": "ConfigController.cs",
               "DocumentMoniker": "C:\\Users\\theep\\OneDrive\\\u0420\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\Aigis-project\\Backend\\Backend\\Controllers\\ConfigController.cs",
               "RelativeDocumentMoniker": "Backend\\Controllers\\ConfigController.cs",
@@ -153,12 +154,11 @@
               "RelativeToolTip": "Backend\\Controllers\\ConfigController.cs",
               "ViewState": "AgIAAC0AAAAAAAAAAAAQwDwAAAAtAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-10-22T14:57:17.621Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-10-22T14:57:17.621Z"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 6,
+              "DocumentIndex": 7,
               "Title": "UsersController.cs",
               "DocumentMoniker": "C:\\Users\\theep\\OneDrive\\\u0420\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\Aigis-project\\Backend\\Backend\\Controllers\\UsersController.cs",
               "RelativeDocumentMoniker": "Backend\\Controllers\\UsersController.cs",
@@ -170,7 +170,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 8,
+              "DocumentIndex": 9,
               "Title": "appsettings.json",
               "DocumentMoniker": "C:\\Users\\theep\\OneDrive\\\u0420\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\Aigis-project\\Backend\\Backend\\appsettings.json",
               "RelativeDocumentMoniker": "Backend\\appsettings.json",
@@ -179,6 +179,18 @@
               "ViewState": "AgIAAAAAAAAAAAAAAAAAAA8AAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001642|",
               "WhenOpened": "2026-10-22T15:04:24.192Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "20261026145710_AddWelcomeAndVoiceConfig.cs",
+              "DocumentMoniker": "C:\\Users\\theep\\OneDrive\\\u0420\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\Aigis-project\\Backend\\Backend\\Migrations\\20261026145710_AddWelcomeAndVoiceConfig.cs",
+              "RelativeDocumentMoniker": "Backend\\Migrations\\20261026145710_AddWelcomeAndVoiceConfig.cs",
+              "ToolTip": "C:\\Users\\theep\\OneDrive\\\u0420\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\Aigis-project\\Backend\\Backend\\Migrations\\20261026145710_AddWelcomeAndVoiceConfig.cs",
+              "RelativeToolTip": "Backend\\Migrations\\20261026145710_AddWelcomeAndVoiceConfig.cs",
+              "ViewState": "AgIAAAgAAAAAAAAAAAAQwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-11-02T09:30:12.467Z"
             },
             {
               "$type": "Bookmark",
