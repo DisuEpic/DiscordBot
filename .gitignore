@@ -3,4 +3,8 @@ bin/
 obj/
 .venv/
 __pycache__/
-*.user
+*.user.vs/
+bin/
+obj/
+__pycache__/
+.env

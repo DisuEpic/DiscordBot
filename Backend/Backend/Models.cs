@@ -23,6 +23,7 @@ public class ServerConfig
     public string? WelcomeTitle {  get; set; }
     public string? WelcomeDescription { get; set; }
     public string? VoiceGeneratorChannelId { get; set; }
+    public string? VoiceRoomTemplate { get; set; }
 }
 
 [Table("Reactions")]

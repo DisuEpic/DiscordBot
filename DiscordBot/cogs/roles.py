@@ -8,6 +8,7 @@ from config import GUILD_ONLY, P3_BLUE, UNIFIED_FOOTER
 
 MAX_ROLES_PER_CATEGORY = 25
 
+
 class Roles(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -15,11 +16,12 @@ class Roles(commands.Cog):
     @commands.Cog.listener("on_button_click")
     async def on_role_button(self, inter: disnake.MessageInteraction):
         custom_id = inter.component.custom_id
-        if not custom_id.startswith("toggle_role_"):
+        if not custom_id.startswith(("toggle_role_", "radio_role_")):
             return
 
         await inter.response.defer()
-        role_id_str = custom_id.replace("toggle_role_", "")
+        is_radio = custom_id.startswith("radio_role_")
+        role_id_str = custom_id.replace("radio_role_", "").replace("toggle_role_", "")
         if not role_id_str.isdigit():
             return
 
@@ -33,6 +35,21 @@ class Roles(commands.Cog):
             if role in member.roles:
                 await member.remove_roles(role, reason="Снятие роли по кнопке")
             else:
+                # Если для этой панели включен режим "Только 1 роль" (single_choice=True)
+                if is_radio and inter.message and inter.message.components:
+                    panel_role_ids = set()
+                    for row in inter.message.components:
+                        for comp in row.children:
+                            cid = getattr(comp, "custom_id", "") or ""
+                            if cid.startswith("radio_role_"):
+                                rid = cid.replace("radio_role_", "")
+                                if rid.isdigit() and rid != role_id_str:
+                                    panel_role_ids.add(int(rid))
+
+                    roles_to_remove = [r for r in member.roles if r.id in panel_role_ids]
+                    if roles_to_remove:
+                        await member.remove_roles(*roles_to_remove, reason="Смена одиночной роли в панели")
+
                 await member.add_roles(role, reason="Получение роли по кнопке")
         except disnake.Forbidden:
             await inter.followup.send(
@@ -72,7 +89,7 @@ class Roles(commands.Cog):
         self,
         inter: disnake.ApplicationCommandInteraction,
         role: disnake.Role,
-        category: str = commands.Param(description="Например: Игры, Уведомления, Платформы"),
+        category: str = commands.Param(description="Например: Игры, Уведомления, Пол, Цвета"),
         emoji: str = commands.Param(description="Смайлик для кнопки (например: 🎮)"),
         custom_name: Optional[str] = commands.Param(default=None, description="Свое название")
     ):
@@ -125,7 +142,8 @@ class Roles(commands.Cog):
         inter: disnake.ApplicationCommandInteraction,
         category: str = commands.Param(description="Какую категорию отправить"),
         title: Optional[str] = commands.Param(default=None, description="Заголовок"),
-        description: Optional[str] = commands.Param(default=None, description="Описание")
+        description: Optional[str] = commands.Param(default=None, description="Описание"),
+        single_choice: bool = commands.Param(default=False, description="Разрешить выбрать только ОДНУ роль из этого блока? (например, Пол или Цвет)")
     ):
         await inter.response.defer(ephemeral=True)
         all_roles = await api.get_roles(str(inter.guild_id))
@@ -140,13 +158,18 @@ class Roles(commands.Cog):
             await inter.edit_original_response(content=f"⚠️ В категории **«{category}»** нет добавленных ролей.")
             return
 
-        embed = disnake.Embed(title=title or f"🎭 Выбор ролей: {category}", description=description or "Нажмите на кнопку для получения/снятия роли:", color=P3_BLUE)
+        embed = disnake.Embed(
+            title=title or f"🎭 Выбор ролей: {category}",
+            description=description or "Нажмите на кнопку для получения/снятия роли:",
+            color=P3_BLUE
+        )
         add_chunked_role_fields(embed, "Доступные роли:", target_roles)
         embed.set_footer(text=UNIFIED_FOOTER)
 
-        view = build_role_buttons_view(target_roles)
+        view = build_role_buttons_view(target_roles, single_choice=single_choice)
         await inter.channel.send(embed=embed, view=view)
-        await inter.edit_original_response(content=f"✅ Блок ролей для категории **«{category}»** успешно опубликован!")
+        mode_text = " (режим: только 1 роль)" if single_choice else " (режим: мульти-выбор)"
+        await inter.edit_original_response(content=f"✅ Блок ролей для категории **«{category}»**{mode_text} успешно опубликован!")
 
     @commands.slash_command(contexts=GUILD_ONLY, name="send_all_categories", description="Отправить все категории ролей отдельными блоками")
     @commands.default_member_permissions(administrator=True)
@@ -173,7 +196,7 @@ class Roles(commands.Cog):
             )
             add_chunked_role_fields(embed, "Доступные роли:", subset)
             embed.set_footer(text=UNIFIED_FOOTER)
-            view = build_role_buttons_view(subset)
+            view = build_role_buttons_view(subset, single_choice=False)
             await inter.channel.send(embed=embed, view=view)
 
         await inter.edit_original_response(content=f"✅ Опубликовано блоков по категориям: **{len(categories)}** шт.")
@@ -186,7 +209,8 @@ class Roles(commands.Cog):
         message_id: str = commands.Param(description="ID сообщения блока ролей в этом канале"),
         category: str = commands.Param(description="Категория ролей из базы для этого блока"),
         title: Optional[str] = commands.Param(default=None, description="Новый заголовок"),
-        description: Optional[str] = commands.Param(default=None, description="Новое описание")
+        description: Optional[str] = commands.Param(default=None, description="Новое описание"),
+        single_choice: Optional[bool] = commands.Param(default=None, description="Разрешить выбрать только ОДНУ роль из этого блока?")
     ):
         await inter.response.defer(ephemeral=True)
         try:
@@ -210,6 +234,16 @@ class Roles(commands.Cog):
             await inter.edit_original_response(content=f"⚠️ В категории **«{category}»** нет актуальных ролей.")
             return
 
+        # Если single_choice не передали явно — сохраняем тот режим, который уже стоял на кнопках этого сообщения
+        if single_choice is None:
+            was_radio = False
+            if msg.components and msg.components[0].children:
+                first_cid = getattr(msg.components[0].children[0], "custom_id", "") or ""
+                was_radio = first_cid.startswith("radio_role_")
+            use_single_choice = was_radio
+        else:
+            use_single_choice = single_choice
+
         old_embed = msg.embeds[0] if msg.embeds else None
         embed_title = title or (old_embed.title if old_embed else f"🎭 Выбор ролей: {category}")
         embed_desc = description or (old_embed.description if old_embed else "Нажмите на кнопку для выбора:")
@@ -218,9 +252,11 @@ class Roles(commands.Cog):
         add_chunked_role_fields(embed, "Доступные роли:", target_roles)
         embed.set_footer(text=UNIFIED_FOOTER)
 
-        view = build_role_buttons_view(target_roles)
+        view = build_role_buttons_view(target_roles, single_choice=use_single_choice)
         await msg.edit(content=None, embed=embed, view=view)
-        await inter.edit_original_response(content=f"✅ Блок ролей для категории **«{category}»** успешно обновлен!")
+        mode_text = " (только 1 роль)" if use_single_choice else " (мульти-выбор)"
+        await inter.edit_original_response(content=f"✅ Блок ролей для категории **«{category}»**{mode_text} успешно обновлен!")
+
 
 def setup(bot: commands.Bot):
     bot.add_cog(Roles(bot))

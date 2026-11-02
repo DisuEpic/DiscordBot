@@ -85,9 +85,21 @@ namespace DiscordBot_API.Migrations
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)");
 
+                    b.Property<string>("VoiceGeneratorChannelId")
+                        .HasColumnType("text");
+
+                    b.Property<string>("VoiceRoomTemplate")
+                        .HasColumnType("text");
+
                     b.Property<string>("WelcomeChannelId")
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)");
+
+                    b.Property<string>("WelcomeDescription")
+                        .HasColumnType("text");
+
+                    b.Property<string>("WelcomeTitle")
+                        .HasColumnType("text");
 
                     b.HasKey("Id");
 

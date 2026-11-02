@@ -14,15 +14,20 @@ class VerifyView(disnake.ui.View):
             custom_id="persistent_verify_button"
         ))
 
-def build_role_buttons_view(roles_subset: List[Dict[str, Any]], button_style: disnake.ButtonStyle = disnake.ButtonStyle.secondary) -> disnake.ui.View:
+def build_role_buttons_view(
+    roles_subset: List[Dict[str, Any]],
+    button_style: disnake.ButtonStyle = disnake.ButtonStyle.secondary,
+    single_choice: bool = False
+) -> disnake.ui.View:
     view = disnake.ui.View(timeout=None)
+    prefix = "radio_role_" if single_choice else "toggle_role_"
     for r in roles_subset[:25]:
         emoji = parse_emoji(r.get("emoji"))
         view.add_item(disnake.ui.Button(
             label=r["name"][:80],
             emoji=emoji,
             style=button_style,
-            custom_id=f"toggle_role_{r['roleId']}"
+            custom_id=f"{prefix}{r['roleId']}"
         ))
     return view
 

@@ -12,7 +12,8 @@ public record ConfigRequest(
     string? TrapChannelId,
     string? WelcomeTitle,
     string? WelcomeDescription,
-    string? VoiceGeneratorChannelId);
+    string? VoiceGeneratorChannelId,
+    string? VoiceRoomTemplate = null);
 
 public record ReactionRoleRequest(string GuildId, string Category, string Emoji, string RoleId, string Name);
 

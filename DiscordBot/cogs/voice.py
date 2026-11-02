@@ -1,35 +1,53 @@
 import disnake
 from disnake.ext import commands
-from typing import Dict, Set
+from typing import Dict, Set, Optional
 from api import api
 from config import P3_BLUE, UNIFIED_FOOTER
 
+
+def format_voice_room_name(custom_text: str, template: Optional[str], generator_name: str = "") -> str:
+    """Формирует имя комнаты по шаблону из БД или автоматически под стиль канала-генератора."""
+    if template and template.strip():
+        tpl = template.strip()
+        if "{user}" in tpl:
+            return tpl.replace("{user}", custom_text)[:40]
+        return f"{tpl} {custom_text}".strip()[:40]
+
+    # Умное авто-определение: если генератор оформлен веточками (╔ 〘➕〙...), делаем ╠ 〘🔊〙
+    if generator_name.startswith(("╔", "╠", "╚")) and "〘" in generator_name:
+        return f"╠ 〘🔊〙 {custom_text}"[:40]
+
+    return f"🔊 Комната {custom_text}"[:40]
+
+
 class RenameVoiceModal(disnake.ui.Modal):
-    def __init__(self, channel: disnake.VoiceChannel):
+    def __init__(self, channel: disnake.VoiceChannel, template: Optional[str], generator_name: str):
         self.channel = channel
+        self.template = template
+        self.generator_name = generator_name
         components = [
             disnake.ui.TextInput(
                 label="Новое название канала",
-                placeholder="Например: 🔊 Комната для игр",
+                placeholder="Например: Играем в Valorant",
                 custom_id="new_voice_name",
                 style=disnake.TextInputStyle.short,
                 min_length=2,
-                max_length=40,
+                max_length=30,
             )
         ]
         super().__init__(title="✏️ Переименовать голосовой канал", components=components)
 
     async def callback(self, inter: disnake.ModalInteraction):
-     raw_name = inter.text_values["new_voice_name"].strip()
-     if not raw_name.startswith(("╠", "╚", "╔")):
-         new_name = f"╠ 〘🔊〙 {raw_name}"[:40]
-     else:
-         new_name = raw_name[:40]
-     try:
-         await self.channel.edit(name=new_name)
-         await inter.response.send_message(f"✅ Канал переименован в **{new_name}**!", ephemeral=True)
-     except disnake.HTTPException:
-         await inter.response.send_message("⚠️ Discord разрешает менять название канала не чаще 2 раз за 10 минут.", ephemeral=True)
+        raw_name = inter.text_values["new_voice_name"].strip()
+        if raw_name.startswith(("╠", "╚", "╔")):
+            new_name = raw_name[:40]
+        else:
+            new_name = format_voice_room_name(raw_name, self.template, self.generator_name)
+        try:
+            await self.channel.edit(name=new_name)
+            await inter.response.send_message(f"✅ Канал переименован в **{new_name}**!", ephemeral=True)
+        except disnake.HTTPException:
+            await inter.response.send_message("⚠️ Discord разрешает менять название канала не чаще 2 раз за 10 минут.", ephemeral=True)
 
 
 class VoiceControlView(disnake.ui.View):
@@ -68,7 +86,11 @@ class VoiceControlView(disnake.ui.View):
             await inter.response.send_message("❌ Только владелец комнаты может управлять этой панелью.", ephemeral=True)
             return
         if isinstance(inter.channel, disnake.VoiceChannel):
-            await inter.response.send_modal(RenameVoiceModal(inter.channel))
+            cfg = await api.get_guild_config(str(inter.guild_id)) or {}
+            gen_id = cfg.get("voiceGeneratorChannelId")
+            gen_ch = inter.guild.get_channel(int(gen_id)) if (gen_id and str(gen_id).isdigit()) else None
+            gen_name = gen_ch.name if gen_ch else ""
+            await inter.response.send_modal(RenameVoiceModal(inter.channel, cfg.get("voiceRoomTemplate"), gen_name))
 
     @disnake.ui.button(label="Выгнать участника", style=disnake.ButtonStyle.danger, emoji="👢")
     async def kick_member(self, button: disnake.ui.Button, inter: disnake.MessageInteraction):
@@ -137,8 +159,8 @@ class VoiceHub(commands.Cog):
             return
 
         guild = member.guild
-        cfg = await api.get_guild_config(str(guild.id))
-        gen_id_str = cfg.get("voiceGeneratorChannelId") if cfg else None
+        cfg = await api.get_guild_config(str(guild.id)) or {}
+        gen_id_str = cfg.get("voiceGeneratorChannelId")
 
         if after.channel and gen_id_str and str(after.channel.id) == str(gen_id_str):
             category = after.channel.category
@@ -149,9 +171,15 @@ class VoiceHub(commands.Cog):
             if guild.me:
                 overwrites[guild.me] = disnake.PermissionOverwrite(connect=True, manage_channels=True, move_members=True, view_channel=True)
 
+            room_name = format_voice_room_name(
+                custom_text=member.display_name,
+                template=cfg.get("voiceRoomTemplate"),
+                generator_name=after.channel.name
+            )
+
             try:
                 new_channel = await guild.create_voice_channel(
-                    name=f"╠ 〘🔊〙 {member.display_name}"[:40],
+                    name=room_name,
                     category=category,
                     position=after.channel.position + 1,
                     overwrites=overwrites,
@@ -182,6 +210,7 @@ class VoiceHub(commands.Cog):
                     await before.channel.delete(reason="Приватная комната опустела")
                 except disnake.HTTPException:
                     pass
+
 
 def setup(bot: commands.Bot):
     bot.add_cog(VoiceHub(bot))

@@ -27,6 +27,7 @@ class Utility(commands.Cog):
         log_channel: Optional[disnake.TextChannel] = commands.Param(default=None, description="Канал для логов (аудита) сервера"),
         trap_channel: Optional[disnake.TextChannel] = commands.Param(default=None, description="Канал-ловушка (кик за любое сообщение)"),
         voice_hub_channel: Optional[disnake.VoiceChannel] = commands.Param(default=None, description="Голосовой канал «➕ Создать комнату»"),
+        voice_room_template: Optional[str] = commands.Param(default=None, description="Шаблон имени приватной комнаты (например: ╠ 〘🔊〙 {user})"),
         create_voice_hub: bool = commands.Param(default=False, description="Автоматически создать категорию и канал для приватных войсов?")
     ):
         await inter.response.defer(ephemeral=True)
@@ -35,27 +36,24 @@ class Utility(commands.Cog):
 
         target_voice_hub = voice_hub_channel
         if create_voice_hub and not target_voice_hub:
-            # 1. Проверяем, есть ли уже живой канал из БД на сервере
             existing_hub_id = existing.get("voiceGeneratorChannelId")
             if existing_hub_id and str(existing_hub_id).isdigit():
                 ch = inter.guild.get_channel(int(existing_hub_id))
                 if isinstance(ch, disnake.VoiceChannel):
                     target_voice_hub = ch
 
-            # 2. Проверяем, нет ли уже канала с таким именем на сервере, чтобы не дублировать
             if not target_voice_hub:
                 for v_ch in inter.guild.voice_channels:
-                    if v_ch.name == "➕ Создать комнату":
+                    if "создать комнату" in v_ch.name.lower():
                         target_voice_hub = v_ch
                         break
 
-            # 3. Создаем только если его действительно еще нет
             if not target_voice_hub:
                 try:
-                    category = disnake.utils.get(inter.guild.categories, name="🔊 Приватные комнаты")
+                    category = disnake.utils.get(inter.guild.categories, name="── 〘🔊〙 Голосовые 〘🔊〙 ──")
                     if not category:
-                        category = await inter.guild.create_category("🔊 Приватные комнаты")
-                    target_voice_hub = await inter.guild.create_voice_channel("➕ Создать комнату", category=category)
+                        category = await inter.guild.create_category("── 〘🔊〙 Голосовые 〘🔊〙 ──")
+                    target_voice_hub = await inter.guild.create_voice_channel("╔ 〘➕〙 Создать комнату", category=category)
                 except disnake.Forbidden:
                     await inter.edit_original_response(content="⚠️ У бота недостаточно прав для автоматического создания каналов.")
                     return
@@ -68,6 +66,7 @@ class Utility(commands.Cog):
             "logChannelId": str(log_channel.id) if log_channel else existing.get("logChannelId"),
             "trapChannelId": str(trap_channel.id) if trap_channel else existing.get("trapChannelId"),
             "voiceGeneratorChannelId": str(target_voice_hub.id) if target_voice_hub else existing.get("voiceGeneratorChannelId"),
+            "voiceRoomTemplate": voice_room_template.strip() if voice_room_template else existing.get("voiceRoomTemplate"),
         }
 
         if await api.save_guild_config(payload):
@@ -117,7 +116,8 @@ class Utility(commands.Cog):
         l_chan = f"<#{cfg['logChannelId']}>" if cfg.get("logChannelId") else "⚪ Отключен"
         t_chan = f"<#{cfg['trapChannelId']}> (Кик за сообщение)" if cfg.get("trapChannelId") else "⚪ Отключен"
         v_hub = f"<#{cfg['voiceGeneratorChannelId']}>" if cfg.get("voiceGeneratorChannelId") else "⚪ Отключен"
-
+        v_tpl = cfg.get("voiceRoomTemplate") or "Авто (по стилю канала)"
+        v_hub = f"<#{cfg['voiceGeneratorChannelId']}> (Шаблон: `{v_tpl}`)" if cfg.get("voiceGeneratorChannelId") else "⚪ Отключен"
         categories_set = set(r.get("category") or "Общие" for r in guild_roles)
         roles_info = f"Всего: **{len(guild_roles)}** шт. в категориях: {', '.join(f'`{c}`' for c in categories_set)}" if guild_roles else "⚪ Роли не добавлены"
 

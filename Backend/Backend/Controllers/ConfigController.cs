@@ -57,6 +57,8 @@ public class ConfigController : ControllerBase
         config.VoiceGeneratorChannelId = voiceGenId;
         config.WelcomeTitle = request.WelcomeTitle;
         config.WelcomeDescription = request.WelcomeDescription;
+        config.VoiceRoomTemplate = string.IsNullOrWhiteSpace(request.VoiceRoomTemplate) ? null :
+            request.VoiceRoomTemplate.Trim();
 
         await _context.SaveChangesAsync();
         return Ok(new { message = "Конфигурация сервера успешно сохранена!" });
