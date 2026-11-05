@@ -1145,24 +1145,28 @@ class AIChat(commands.Cog):
     # -------------------------------------------------------------------------
     # ЕДИНАЯ КОМАНДА УПРАВЛЕНИЯ ИИ (/ai)
     # -------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
+    # ЕДИНАЯ КОМАНДА УПРАВЛЕНИЯ ИИ (/ai) — ТОЛЬКО ДЛЯ АДМИНИСТРАТОРОВ
+    # -------------------------------------------------------------------------
     @commands.slash_command(
         contexts=GUILD_ONLY,
         name="ai",
-        description="🤖 Управление ИИ Aigis (панель настроек или быстрое переключение)"
+        description="🤖 Управление ИИ Aigis (Только для администраторов)"
     )
     @commands.default_member_permissions(administrator=True)
+    @commands.has_permissions(administrator=True)
     async def ai_control_panel(
         self,
         inter: disnake.ApplicationCommandInteraction,
         model: Optional[str] = commands.Param(
             default=None,
             choices={
-                "Авто-выбор (Все модели)": "auto",
-                "Google Gemini": "gemini",
-                "ChatGPT (GPT-4o-mini)": "chatgpt",
-                "DeepSeek V3": "deepseek",
-                "Mistral AI": "mistral",
-                "Meta Llama 3.3 70B": "llama",
+                "🔄 Авто-выбор (Все модели)": "auto",
+                "✨ Google Gemini": "gemini",
+                "🟢 ChatGPT (GPT-4o-mini)": "chatgpt",
+                "🐋 DeepSeek V3": "deepseek",
+                "🌪️ Mistral AI": "mistral",
+                "🦙 Meta Llama 3.3 70B": "llama",
             },
             description="Быстро сменить модель нейросети"
         ),
@@ -1183,6 +1187,15 @@ class AIChat(commands.Cog):
             description="Очистить память диалога в текущем канале?"
         )
     ):
+        # Жесткая проверка прав администратора (или создателя бота)
+        await self._ensure_creator_id()
+        if not inter.author.guild_permissions.administrator and inter.author.id not in self.creator_ids:
+            await inter.response.send_message(
+                "⛔ Доступ запрещен: управлять модулем ИИ могут только администраторы сервера.",
+                ephemeral=True
+            )
+            return
+
         await inter.response.defer(ephemeral=True)
 
         updates = {}
