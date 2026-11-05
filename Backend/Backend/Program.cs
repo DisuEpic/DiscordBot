@@ -66,6 +66,7 @@ using (var scope = app.Services.CreateScope())
             ALTER TABLE "ServerConfigs" ADD COLUMN IF NOT EXISTS "AiMode" character varying(32) DEFAULT 'standard';
             ALTER TABLE "ServerConfigs" ADD COLUMN IF NOT EXISTS "AiCustomScenario" text;
             ALTER TABLE "ServerConfigs" ADD COLUMN IF NOT EXISTS "AiCustomRules" text;
+            ALTER TABLE "ServerConfigs" ADD COLUMN IF NOT EXISTS "AiProvider" character varying(32) DEFAULT 'auto';
         """);
     }
     catch (Exception ex)

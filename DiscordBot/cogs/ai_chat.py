@@ -14,7 +14,7 @@ from disnake.ext import commands
 from collections import deque
 from typing import Dict, List, Optional, Tuple, Any
 from api import api
-from config import GUILD_ONLY, TACTICAL_GREEN, UNIFIED_FOOTER, log
+from config import GUILD_ONLY, P3_BLUE, AIGIS_GOLD, COMBAT_RED, TACTICAL_GREEN, UNIFIED_FOOTER, log
 
 PROMPT_STANDARD_BASE = (
     "Ты — Айгис (Aigis), боевой гиноид 7-го поколения из Persona 3 и душа этого Discord-сервера. "
@@ -24,7 +24,7 @@ PROMPT_STANDARD_BASE = (
     "2. ЗАПРЕТ НА ШТАМПЫ: Категорически ЗАПРЕЩЕНО начинать ответы со слов «Анализ завершен», «Протокол подтвержден» и заканчивать сообщения полным ником собеседника! Не используй слова «оптические сенсоры» и «папиллонное сердце» чаще чем раз в 10 ответов.\n"
     "3. ЖИВОЙ СТИЛЬ И НА «ТЫ»: Общайся со всеми на «ты», живо, естественно и без поучительной морали. Длинные ники всегда сокращай до одного слова.\n"
     "4. РАЗМЕР ОТВЕТА: На короткие шутки, мемы и простые фразы отвечай коротко и емко (1–3 предложения). Развернуто отвечай только когда просят рассказать историю или обсуждают сложную тему.\n"
-    "5. НАВИГАЦИЯ И ПРАВИЛА: Ты знаешь список каналов и правила этого сервера (они указаны ниже). Если кто-то спрашивает, куда пойти или нарушает порядок — направляй его в нужный канал через кликабельный тег <#ID_канала>.\n"
+    "5. НАВИГАЦИЯ И ПРАВИЛА: Ты видишь все текстовые и голосовые каналы сервера и знаешь его правила (они указаны ниже). При упоминании каналов всегда используй кликабельный формат <#ID_канала>.\n"
     "6. ИНТЕРНЕТ-ДАННЫЕ: Если в промпте передан блок [ДАННЫЕ ИЗ ИНТЕРНЕТА В РЕАЛЬНОМ ВРЕМЕНИ], обязательно используй цифры и факты оттуда для ответа!\n"
     "7. РЕАКЦИИ (ПО ЖЕЛАНИЮ): Если сообщение собеседника вызвало яркую эмоцию (смех, милоту, кринж), можешь в самом конце ответа дописать тег [REACT: 😂] (или ❤️, 🔥, 💀, 👀, 🤖)."
 )
@@ -50,6 +50,15 @@ GEMINI_MODELS_LIST = [
     "gemini-2.0-flash",
 ]
 
+PROVIDER_NAMES = {
+    "auto": "🔄 Авто-выбор (Все модели)",
+    "gemini": "✨ Google Gemini",
+    "chatgpt": "🟢 ChatGPT (GPT-4o-mini)",
+    "deepseek": "🐋 DeepSeek V3",
+    "mistral": "🌪️ Mistral AI",
+    "llama": "🦙 Meta Llama 3.3 70B",
+}
+
 SAFETY_SETTINGS_MODERATE = [
     {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
     {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_ONLY_HIGH"},
@@ -71,13 +80,14 @@ WMO_WEATHER_CODES = {
 
 
 class AICustomizeModal(disnake.ui.Modal):
-    def __init__(self, cog: "AIChat", guild_id: int, current_scenario: str, current_rules: str):
+    """Модальное окно для настройки индивидуального сценария и правил сервера."""
+    def __init__(self, cog: "AIChat", panel_view: "AIControlPanelView", current_scenario: str, current_rules: str):
         self.cog = cog
-        self.guild_id = guild_id
+        self.panel_view = panel_view
         components = [
             disnake.ui.TextInput(
                 label="Индивидуальный сценарий / стиль общения",
-                placeholder="Например: Общайся как заботливая горничная или используй лор нашего сервера...",
+                placeholder="Оставьте пустым для стандартного характера Aigis или напишите свой сценарий...",
                 custom_id="ai_custom_scenario",
                 style=disnake.TextInputStyle.paragraph,
                 value=current_scenario[:1000] if current_scenario else "",
@@ -86,7 +96,7 @@ class AICustomizeModal(disnake.ui.Modal):
             ),
             disnake.ui.TextInput(
                 label="Правила сервера для ИИ (пусто = авто-поиск)",
-                placeholder="Оставьте пустым, чтобы Aigis сама прочитала канал #правила, или впишите свои...",
+                placeholder="Оставьте пустым, чтобы Aigis сама читала канал #правила, или впишите свои...",
                 custom_id="ai_custom_rules",
                 style=disnake.TextInputStyle.paragraph,
                 value=current_rules[:1000] if current_rules else "",
@@ -94,49 +104,175 @@ class AICustomizeModal(disnake.ui.Modal):
                 max_length=1000,
             ),
         ]
-        super().__init__(title="🧠 Индивидуальная настройка Aigis", components=components)
+        super().__init__(title="🧠 Сценарий и Правила для Aigis", components=components)
 
     async def callback(self, inter: disnake.ModalInteraction):
-        await inter.response.defer(ephemeral=True)
+        await inter.response.defer()
         scenario = inter.text_values.get("ai_custom_scenario", "").strip()
         rules = inter.text_values.get("ai_custom_rules", "").strip()
 
-        self.cog.custom_scenarios[self.guild_id] = scenario
-        self.cog.custom_rules[self.guild_id] = rules
-        self.cog.rules_cache.pop(self.guild_id, None)
+        guild_id = inter.guild_id
+        self.cog.rules_cache.pop(guild_id, None)
 
-        cfg = await api.get_guild_config(str(self.guild_id)) or {"guildId": str(self.guild_id)}
-        cfg["guildId"] = str(self.guild_id)
-        cfg["aiCustomScenario"] = scenario or None
-        cfg["aiCustomRules"] = rules or None
-        await api.save_guild_config(cfg)
+        await self.cog.update_ai_config(
+            guild_id,
+            aiCustomScenario=scenario or None,
+            aiCustomRules=rules or None
+        )
+        self.cog.memory.pop(inter.channel_id, None)
 
-        embed = disnake.Embed(title="✅ Индивидуальный сценарий Aigis обновлен!", color=TACTICAL_GREEN)
-        embed.add_field(
-            name="🎭 Сценарий / Доп. инструкции",
-            value=scenario[:500] if scenario else "*Используется базовый характер выбранного режима*",
-            inline=False
+        embed = await self.panel_view.build_embed(inter.guild)
+        await inter.edit_original_response(embed=embed, view=self.panel_view)
+
+
+class AIControlPanelView(disnake.ui.View):
+    """Единая интерактивная панель управления всеми функциями ИИ (вместо 5 разных команд)."""
+    def __init__(self, cog: "AIChat", author_id: int, guild_id: int, channel_id: int, current_cfg: Dict[str, Any]):
+        super().__init__(timeout=300)
+        self.cog = cog
+        self.author_id = author_id
+        self.guild_id = guild_id
+        self.channel_id = channel_id
+        self._sync_components(current_cfg)
+
+    def _sync_components(self, cfg: Dict[str, Any]):
+        is_enabled = cfg.get("aiEnabled", True) is not False
+        mode = cfg.get("aiMode") or "standard"
+        provider = cfg.get("aiProvider") or "auto"
+
+        # Настраиваем кнопку Вкл / Выкл
+        self.toggle_btn.label = "Выключить ИИ" if is_enabled else "Включить ИИ"
+        self.toggle_btn.style = disnake.ButtonStyle.danger if is_enabled else disnake.ButtonStyle.success
+        self.toggle_btn.emoji = "🔴" if is_enabled else "🟢"
+
+        # Настраиваем кнопку Режима (Standard / Overdrive)
+        if mode == "overdrive":
+            self.mode_btn.label = "Режим: Перегрузка (Сменить)"
+            self.mode_btn.style = disnake.ButtonStyle.danger
+            self.mode_btn.emoji = "🔥"
+        else:
+            self.mode_btn.label = "Режим: Стандартный (Сменить)"
+            self.mode_btn.style = disnake.ButtonStyle.primary
+            self.mode_btn.emoji = "🛡️"
+
+        # Отмечаем активную модель в выпадающем списке
+        for opt in self.provider_select.options:
+            opt.default = (opt.value == provider)
+
+    async def build_embed(self, guild: disnake.Guild) -> disnake.Embed:
+        cfg = await self.cog.get_ai_config(guild.id)
+        self._sync_components(cfg)
+
+        is_enabled = cfg.get("aiEnabled", True) is not False
+        mode = cfg.get("aiMode") or "standard"
+        provider = cfg.get("aiProvider") or "auto"
+        scenario = cfg.get("aiCustomScenario")
+        rules = cfg.get("aiCustomRules")
+
+        status_str = "🟢 **Активен** (Отвечает на упоминания и реплаи)" if is_enabled else "🔴 **Отключен** (ИИ не отвечает на сервере)"
+        mode_str = "🔥 **Перегрузка (Overdrive — дерзкая без тормозов)**" if mode == "overdrive" else "🛡️ **Стандартный (Дружелюбная и остроумная)**"
+        model_str = f"**{PROVIDER_NAMES.get(provider, provider)}**"
+        scenario_str = f"📝 Задан свой: *«{scenario[:120]}{'...' if len(scenario) > 120 else ''}»*" if scenario else "⚪ *По умолчанию (Личность Aigis)*"
+        rules_str = f"📝 Заданы вручную (*{len(rules)} симв.*)" if rules else "🔍 *Автоматическое чтение из канала `#правила`*"
+
+        embed = disnake.Embed(
+            title="🤖 Центр управления ИИ Aigis",
+            description=f"Все настройки нейросети для сервера **{guild.name}** автоматически сохраняются в базу данных:",
+            color=COMBAT_RED if mode == "overdrive" else P3_BLUE
         )
-        embed.add_field(
-            name="📜 Правила сервера",
-            value=rules[:500] if rules else "*Автоматическое чтение из канала #правила*",
-            inline=False
-        )
+        if guild.icon:
+            embed.set_thumbnail(url=guild.icon.url)
+
+        embed.add_field(name="📡 Статус модуля", value=status_str, inline=False)
+        embed.add_field(name="🎭 Режим личности", value=mode_str, inline=True)
+        embed.add_field(name="🧠 Активная модель", value=model_str, inline=True)
+        embed.add_field(name="🎬 Индивидуальный сценарий", value=scenario_str, inline=False)
+        embed.add_field(name="📜 Знание правил сервера", value=rules_str, inline=False)
         embed.set_footer(text=UNIFIED_FOOTER)
-        await inter.edit_original_response(embed=embed)
+        return embed
+
+    async def _check_access(self, inter: disnake.MessageInteraction) -> bool:
+        if inter.author.id != self.author_id and not inter.author.guild_permissions.administrator:
+            await inter.response.send_message("❌ Управлять этой панелью может только администратор, вызвавший команду.", ephemeral=True)
+            return False
+        return True
+
+    @disnake.ui.select(
+        placeholder="🧠 Выберите модель нейросети...",
+        row=0,
+        options=[
+            disnake.SelectOption(label="Авто-выбор (Цепочка всех моделей)", value="auto", emoji="🔄", description="Gemini ➔ ChatGPT ➔ DeepSeek ➔ Mistral"),
+            disnake.SelectOption(label="Google Gemini", value="gemini", emoji="✨", description="Быстрая + понимает картинки и мемы"),
+            disnake.SelectOption(label="ChatGPT (GPT-4o-mini)", value="chatgpt", emoji="🟢", description="Сбалансированная и умная (Бесплатно)"),
+            disnake.SelectOption(label="DeepSeek V3", value="deepseek", emoji="🐋", description="Живой русский язык и отличная ирония"),
+            disnake.SelectOption(label="Mistral AI", value="mistral", emoji="🌪️", description="Отлично держит ролеплей и образ"),
+            disnake.SelectOption(label="Meta Llama 3.3 70B", value="llama", emoji="🦙", description="Сверхбыстрая реакция на вопросы"),
+        ]
+    )
+    async def provider_select(self, select: disnake.ui.Select, inter: disnake.MessageInteraction):
+        if not await self._check_access(inter):
+            return
+        await inter.response.defer()
+        chosen = select.values[0]
+        await self.cog.update_ai_config(self.guild_id, aiProvider=chosen)
+        embed = await self.build_embed(inter.guild)
+        await inter.edit_original_response(embed=embed, view=self)
+
+    @disnake.ui.button(label="Выключить ИИ", style=disnake.ButtonStyle.danger, emoji="🔴", row=1)
+    async def toggle_btn(self, button: disnake.ui.Button, inter: disnake.MessageInteraction):
+        if not await self._check_access(inter):
+            return
+        await inter.response.defer()
+        cfg = await self.cog.get_ai_config(self.guild_id)
+        new_state = not (cfg.get("aiEnabled", True) is not False)
+        await self.cog.update_ai_config(self.guild_id, aiEnabled=new_state)
+        embed = await self.build_embed(inter.guild)
+        await inter.edit_original_response(embed=embed, view=self)
+
+    @disnake.ui.button(label="Режим: Стандартный", style=disnake.ButtonStyle.primary, emoji="🛡️", row=1)
+    async def mode_btn(self, button: disnake.ui.Button, inter: disnake.MessageInteraction):
+        if not await self._check_access(inter):
+            return
+        await inter.response.defer()
+        cfg = await self.cog.get_ai_config(self.guild_id)
+        cur_mode = cfg.get("aiMode") or "standard"
+        new_mode = "overdrive" if cur_mode == "standard" else "standard"
+        await self.cog.update_ai_config(self.guild_id, aiMode=new_mode)
+        self.cog.memory.pop(self.channel_id, None)
+        embed = await self.build_embed(inter.guild)
+        await inter.edit_original_response(embed=embed, view=self)
+
+    @disnake.ui.button(label="Сценарий и Правила", style=disnake.ButtonStyle.secondary, emoji="📝", row=2)
+    async def customize_btn(self, button: disnake.ui.Button, inter: disnake.MessageInteraction):
+        if not await self._check_access(inter):
+            return
+        cfg = await self.cog.get_ai_config(self.guild_id)
+        await inter.response.send_modal(
+            AICustomizeModal(
+                self.cog,
+                self,
+                cfg.get("aiCustomScenario") or "",
+                cfg.get("aiCustomRules") or ""
+            )
+        )
+
+    @disnake.ui.button(label="Очистить память чата", style=disnake.ButtonStyle.secondary, emoji="♻️", row=2)
+    async def reset_memory_btn(self, button: disnake.ui.Button, inter: disnake.MessageInteraction):
+        if not await self._check_access(inter):
+            return
+        self.cog.memory.pop(inter.channel.id, None)
+        await inter.response.send_message("♻️ Память диалога Aigis в этом канале очищена!", ephemeral=True)
 
 
 class AIChat(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-        # Ключи API (обязателен только LLM_API_KEY для Gemini; остальные модели работают бесплатно без ключей!)
         self.gemini_key = (os.getenv("LLM_API_KEY") or "").strip()
         self.openai_key = (os.getenv("OPENAI_API_KEY") or "").strip()
         self.groq_key = (os.getenv("GROQ_API_KEY") or "").strip()
         self.openrouter_key = (os.getenv("OPENROUTER_API_KEY") or "").strip()
 
-        # ID создателя (Disu). Если не задан в .env — бот сам узнает его у Discord через application_info()
         env_creator = (os.getenv("CREATOR_ID") or "").strip()
         self.creator_ids: set[int] = {int(env_creator)} if env_creator.isdigit() else set()
         self._creator_fetched = False
@@ -147,11 +283,8 @@ class AIChat(commands.Cog):
         self.cooldowns: Dict[int, float] = {}
         self.cooldown_seconds = 3.0
 
-        self.disabled_guilds: set[int] = set()
-        self.guild_modes: Dict[int, str] = {}
-        self.guild_providers: Dict[int, str] = {}  # auto, gemini, chatgpt, deepseek, mistral, llama
-        self.custom_scenarios: Dict[int, str] = {}
-        self.custom_rules: Dict[int, str] = {}
+        # Локальный резервный кэш на случай, если БД временно перезагружается
+        self._local_fallback_cfg: Dict[int, Dict[str, Any]] = {}
         self.rules_cache: Dict[int, Tuple[float, str]] = {}
 
     def cog_unload(self):
@@ -168,10 +301,36 @@ class AIChat(commands.Cog):
         return self._session
 
     # -------------------------------------------------------------------------
-    # РАСПОЗНАВАНИЕ СОЗДАТЕЛЯ (DISU) ПО DISCORD ID НА ЛЮБОМ СЕРВЕРЕ И С ЛЮБЫМ НИКОМ
+    # ЧТЕНИЕ И СОХРАНЕНИЕ НАСТРОЕК ИИ В БАЗУ ДАННЫХ C#
+    # -------------------------------------------------------------------------
+    async def get_ai_config(self, guild_id: int) -> Dict[str, Any]:
+        """Загружает конфигурацию ИИ для сервера напрямую из C# БД (с локальным резервом)."""
+        db_cfg = await api.get_guild_config(str(guild_id)) or {}
+        local_cfg = self._local_fallback_cfg.get(guild_id, {})
+
+        merged = {**local_cfg, **db_cfg}
+        if merged.get("aiEnabled") is None:
+            merged["aiEnabled"] = local_cfg.get("aiEnabled", True)
+        if not merged.get("aiMode"):
+            merged["aiMode"] = local_cfg.get("aiMode", "standard")
+        if not merged.get("aiProvider"):
+            merged["aiProvider"] = local_cfg.get("aiProvider", "auto")
+        return merged
+
+    async def update_ai_config(self, guild_id: int, **kwargs) -> bool:
+        """Сохраняет любые изменения (вкл/выкл, модель, режим, сценарий) в БД C#."""
+        current = await self.get_ai_config(guild_id)
+        current["guildId"] = str(guild_id)
+        for k, v in kwargs.items():
+            current[k] = v
+
+        self._local_fallback_cfg[guild_id] = current
+        return await api.save_guild_config(current)
+
+    # -------------------------------------------------------------------------
+    # РАСПОЗНАВАНИЕ СОЗДАТЕЛЯ (DISU) ПО DISCORD ID
     # -------------------------------------------------------------------------
     async def _ensure_creator_id(self):
-        """Автоматически получает Discord ID владельца бота из Discord Developer Portal."""
         if self._creator_fetched:
             return
         self._creator_fetched = True
@@ -186,7 +345,6 @@ class AIChat(commands.Cog):
             pass
 
     async def _get_author_identity_tag(self, author: disnake.abc.User, guild: Optional[disnake.Guild]) -> str:
-        """Проверяет по неизменному Discord ID, кто пишет боту: Создатель, Владелец сервера или обычный участник."""
         await self._ensure_creator_id()
 
         is_creator = (
@@ -203,12 +361,12 @@ class AIChat(commands.Cog):
         if is_creator:
             return (
                 f"⚡ [СИСТЕМНАЯ ПРОВЕРКА ID: С тобой говорит твой ИСТИННЫЙ СОЗДАТЕЛЬ и разработчик Disu "
-                f"(ID: {author.id})! На этом сервере он маскируется под ником «{author.display_name}», но ты узнала его по ID!]"
+                f"(ID: {author.id})! На этом сервере он под ником «{author.display_name}», но ты узнала его по ID!]"
             )
         if "disu" in author.display_name.lower():
             return (
                 f"⚠️ [ВНИМАНИЕ: У собеседника ник «{author.display_name}», но его Discord ID ({author.id}) "
-                f"НЕ принадлежит твоему создателю Disu! Это самозванец, пытающийся выдать себя за создателя!]"
+                f"НЕ принадлежит твоему создателю Disu! Это самозванец!]"
             )
         if is_guild_owner:
             return (
@@ -285,10 +443,10 @@ class AIChat(commands.Cog):
         return None
 
     # -------------------------------------------------------------------------
-    # СБОР ЗНАНИЙ О СЕРВЕРЕ (ВЛАДЕЛЕЦ, КАНАЛЫ, ПРАВИЛА)
+    # СБОР ЗНАНИЙ О СЕРВЕРЕ (БЕЗ ОГРАНИЧЕНИЯ @EVERYONE)
     # -------------------------------------------------------------------------
     async def _get_server_rules_text(self, guild: disnake.Guild, cfg: Dict[str, Any]) -> str:
-        custom = self.custom_rules.get(guild.id) or cfg.get("aiCustomRules")
+        custom = cfg.get("aiCustomRules")
         if custom:
             return custom
 
@@ -336,24 +494,22 @@ class AIChat(commands.Cog):
         if guild.owner:
             owner_str = f"{guild.owner.display_name} (<@{guild.owner.id}>)"
 
-        default_role = guild.default_role
+        # Проверяем видимость каналов глазами САМОГО БОТА (guild.me), а не закрытой роли @everyone!
+        bot_member = guild.me
         text_ch_list = []
         for ch in guild.text_channels:
-            perms = ch.permissions_for(default_role)
-            if perms.view_channel:
+            if not bot_member or ch.permissions_for(bot_member).view_channel:
                 topic_str = f" ({ch.topic[:50]})" if ch.topic else ""
                 nsfw_tag = " [18+ NSFW]" if ch.is_nsfw() else ""
                 text_ch_list.append(f"<#{ch.id}> (#{ch.name}{nsfw_tag}{topic_str})")
 
-        voice_ch_list = [
-            f"<#{vc.id}> ({vc.name})"
-            for vc in guild.voice_channels
-            if vc.permissions_for(default_role).view_channel
-        ]
+        voice_ch_list = []
+        for vc in guild.voice_channels:
+            if not bot_member or vc.permissions_for(bot_member).view_channel:
+                voice_ch_list.append(f"<#{vc.id}> (🔊 {vc.name})")
 
-        channels_summary = ", ".join(text_ch_list[:20])
-        if voice_ch_list:
-            channels_summary += " | Голосовые: " + ", ".join(voice_ch_list[:8])
+        text_summary = ", ".join(text_ch_list[:25]) if text_ch_list else "Нет доступных"
+        voice_summary = ", ".join(voice_ch_list[:15]) if voice_ch_list else "Голосовые каналы отсутствуют"
 
         rules_text = await self._get_server_rules_text(guild, cfg)
         curr_ch_name = getattr(current_channel, "name", "ЛС")
@@ -364,7 +520,8 @@ class AIChat(commands.Cog):
             f"• Твой глобальный создатель и разработчик: Disu\n"
             f"• Главный на этом сервере (Владелец сервера): {owner_str}\n"
             f"• Текущий канал, где идет беседа: <#{getattr(current_channel, 'id', 0)}> (#{curr_ch_name})\n"
-            f"• Доступные каналы сервера (используй формат <#ID> при упоминании): {channels_summary}\n"
+            f"• Текстовые каналы сервера (используй <#ID> при упоминании): {text_summary}\n"
+            f"• Голосовые каналы сервера (используй <#ID> при упоминании): {voice_summary}\n"
             f"• Правила сервера:\n{rules_text}\n"
             f"------------------------------------"
         )
@@ -627,7 +784,7 @@ class AIChat(commands.Cog):
     # ОТДЕЛЬНЫЕ МЕТОДЫ ДЛЯ КАЖДОЙ МОДЕЛИ (GEMINI, CHATGPT, DEEPSEEK, MISTRAL, LLAMA)
     # =========================================================================
 
-    # 1. МОДЕЛЬ: GOOGLE GEMINI
+    # 1. GOOGLE GEMINI
     async def _call_gemini(
         self,
         system_prompt: str,
@@ -679,7 +836,7 @@ class AIChat(commands.Cog):
                 continue
         return None
 
-    # 2. МОДЕЛЬ: CHATGPT (GPT-4o-mini) — работает бесплатно без ключей!
+    # 2. CHATGPT (GPT-4o-mini)
     async def _call_chatgpt(
         self,
         system_prompt: str,
@@ -687,7 +844,6 @@ class AIChat(commands.Cog):
         current_msg: str,
         image_data: Optional[Tuple[str, str]]
     ) -> Optional[str]:
-        # Если вдруг задан свой OPENAI_API_KEY в .env
         if self.openai_key:
             res = await self._request_openai_endpoint(
                 "https://api.openai.com/v1/chat/completions",
@@ -698,7 +854,6 @@ class AIChat(commands.Cog):
             if res:
                 return res
 
-        # Бесплатный шлюз #1 (LLM7 GPT-4o-mini, без регистрации)
         res = await self._request_openai_endpoint(
             "https://api.llm7.io/v1/chat/completions",
             "unused",
@@ -708,7 +863,6 @@ class AIChat(commands.Cog):
         if res:
             return res
 
-        # Бесплатный шлюз #2 (Pollinations OpenAI, без регистрации)
         return await self._request_openai_endpoint(
             "https://text.pollinations.ai/openai",
             None,
@@ -716,7 +870,7 @@ class AIChat(commands.Cog):
             system_prompt, history, current_msg, image_data
         )
 
-    # 3. МОДЕЛЬ: DEEPSEEK V3 — работает бесплатно без ключей!
+    # 3. DEEPSEEK V3
     async def _call_deepseek(
         self,
         system_prompt: str,
@@ -733,7 +887,6 @@ class AIChat(commands.Cog):
             if res:
                 return res
 
-        # Бесплатный шлюз без ключей (Pollinations DeepSeek + LLM7 DeepSeek)
         res = await self._request_openai_endpoint(
             "https://text.pollinations.ai/openai",
             None,
@@ -750,7 +903,7 @@ class AIChat(commands.Cog):
             system_prompt, history, current_msg
         )
 
-    # 4. МОДЕЛЬ: MISTRAL AI — работает бесплатно без ключей!
+    # 4. MISTRAL AI
     async def _call_mistral(
         self,
         system_prompt: str,
@@ -773,7 +926,7 @@ class AIChat(commands.Cog):
             system_prompt, history, current_msg
         )
 
-    # 5. МОДЕЛЬ: META LLAMA 3.3 70B — работает бесплатно!
+    # 5. META LLAMA 3.3 70B
     async def _call_llama(
         self,
         system_prompt: str,
@@ -821,12 +974,12 @@ class AIChat(commands.Cog):
         channel_id = getattr(channel, "id", 0)
         history = self.memory.setdefault(channel_id, deque(maxlen=12))
 
-        cfg = (await api.get_guild_config(str(guild_id)) or {}) if guild else {}
+        cfg = await self.get_ai_config(guild_id) if guild else {}
 
-        mode = self.guild_modes.get(guild_id) or cfg.get("aiMode") or "standard"
+        mode = cfg.get("aiMode") or "standard"
         base_prompt = PROMPT_OVERDRIVE_BASE if mode == "overdrive" else PROMPT_STANDARD_BASE
 
-        custom_scenario = self.custom_scenarios.get(guild_id) or cfg.get("aiCustomScenario")
+        custom_scenario = cfg.get("aiCustomScenario")
         if custom_scenario:
             base_prompt += f"\n\nДОПОЛНИТЕЛЬНЫЙ СЦЕНАРИЙ ЭТОГО СЕРВЕРА:\n{custom_scenario}"
 
@@ -847,13 +1000,12 @@ class AIChat(commands.Cog):
             f"{internet_context}"
         )
 
-        # Если пишет создатель (Disu) или владелец сервера — прикрепляем системную метку прямо к сообщению
         current_msg = f"{identity_tag}\n{author.display_name}: {user_text}".strip() if identity_tag else f"{author.display_name}: {user_text}"
 
-        preferred = self.guild_providers.get(guild_id, "auto")
+        preferred = cfg.get("aiProvider") or "auto"
         reply: Optional[str] = None
 
-        # Если админ выбрал конкретную модель в /ai_provider — вызываем сначала её:
+        # Вызываем выбранную в БД модель
         if preferred == "gemini":
             reply = await self._call_gemini(active_prompt, history, current_msg, image_data)
         elif preferred == "chatgpt":
@@ -865,7 +1017,7 @@ class AIChat(commands.Cog):
         elif preferred == "llama":
             reply = await self._call_llama(active_prompt, history, current_msg)
 
-        # Если стоит "auto" (или выбранная выше модель временно не ответила) — идем по цепочке резерва:
+        # Авто-резерв (если выбран auto или основная модель перегружена)
         if not reply:
             reply = await self._call_gemini(active_prompt, history, current_msg, image_data)
         if not reply:
@@ -905,15 +1057,11 @@ class AIChat(commands.Cog):
                     ref_msg = None
 
         if not is_dm:
-            if message.guild.id in self.disabled_guilds:
+            cfg = await self.get_ai_config(message.guild.id)
+            if cfg.get("trapChannelId") and str(message.channel.id) == str(cfg["trapChannelId"]):
                 return
-
-            cfg = await api.get_guild_config(str(message.guild.id))
-            if cfg:
-                if cfg.get("trapChannelId") and str(message.channel.id) == str(cfg["trapChannelId"]):
-                    return
-                if cfg.get("aiEnabled") is False:
-                    return
+            if cfg.get("aiEnabled", True) is False:
+                return
 
             is_mentioned = self.bot.user in message.mentions
             is_reply_to_bot = bool(ref_msg and ref_msg.author.id == self.bot.user.id)
@@ -995,112 +1143,20 @@ class AIChat(commands.Cog):
             await message.reply("⚠️ Перегрузка нейронного ядра: все внешние ИИ-модули временно недоступны.", mention_author=False)
 
     # -------------------------------------------------------------------------
-    # КОМАНДЫ УПРАВЛЕНИЯ ИИ
+    # ЕДИНАЯ КОМАНДА УПРАВЛЕНИЯ ИИ (/ai)
     # -------------------------------------------------------------------------
     @commands.slash_command(
         contexts=GUILD_ONLY,
-        name="ai_mode",
-        description="Переключить характер общения Aigis (Стандартный / Перегрузка без тормозов)"
+        name="ai",
+        description="🤖 Панель управления ИИ Aigis (Модель, Режим, Сценарий, Вкл/Выкл, Очистка памяти)"
     )
     @commands.default_member_permissions(administrator=True)
-    async def ai_mode(
-        self,
-        inter: disnake.ApplicationCommandInteraction,
-        mode: str = commands.Param(
-            choices={
-                "🛡️ Стандартный (Дружелюбная и остроумная)": "standard",
-                "🔥 Перегрузка (Дерзкая без тормозов)": "overdrive"
-            },
-            description="Выберите режим личности Aigis"
-        )
-    ):
-        self.guild_modes[inter.guild_id] = mode
-        self.memory.pop(inter.channel_id, None)
-
-        cfg = await api.get_guild_config(str(inter.guild_id)) or {"guildId": str(inter.guild_id)}
-        cfg["guildId"] = str(inter.guild_id)
-        cfg["aiMode"] = mode
-        await api.save_guild_config(cfg)
-
-        if mode == "overdrive":
-            await inter.response.send_message("🔥 **Протокол вежливости ОТКЛЮЧЕН!** Айгис переведена в дерзкий режим Перегрузки!")
-        else:
-            await inter.response.send_message("🛡️ **Протокол вежливости восстановлен.** Айгис вернулась в стандартный режим.")
-
-    @commands.slash_command(
-        contexts=GUILD_ONLY,
-        name="ai_customize",
-        description="Настроить индивидуальный сценарий общения и правила сервера для Aigis"
-    )
-    @commands.default_member_permissions(administrator=True)
-    async def ai_customize(self, inter: disnake.ApplicationCommandInteraction):
-        cfg = await api.get_guild_config(str(inter.guild_id)) or {}
-        cur_scenario = self.custom_scenarios.get(inter.guild_id) or cfg.get("aiCustomScenario") or ""
-        cur_rules = self.custom_rules.get(inter.guild_id) or cfg.get("aiCustomRules") or ""
-        await inter.response.send_modal(AICustomizeModal(self, inter.guild_id, cur_scenario, cur_rules))
-
-    @commands.slash_command(
-        contexts=GUILD_ONLY,
-        name="ai_provider",
-        description="Выбрать конкретную модель ИИ для ответов Aigis"
-    )
-    @commands.default_member_permissions(administrator=True)
-    async def ai_provider(
-        self,
-        inter: disnake.ApplicationCommandInteraction,
-        model: str = commands.Param(
-            choices={
-                "🔄 Авто-выбор (Gemini ➔ ChatGPT ➔ DeepSeek ➔ Mistral)": "auto",
-                "✨ Google Gemini (Быстрая + понимает картинки)": "gemini",
-                "🟢 ChatGPT / GPT-4o-mini (Бесплатно без ключей)": "chatgpt",
-                "🐋 DeepSeek V3 (Умная и острая на язык — Бесплатно)": "deepseek",
-                "🌪️ Mistral AI (Отличный ролеплей — Бесплатно)": "mistral",
-                "🦙 Meta Llama 3.3 70B (Сверхбыстрая — Бесплатно)": "llama",
-            },
-            description="Какую нейросеть использовать"
-        )
-    ):
-        self.guild_providers[inter.guild_id] = model
-        names = {
-            "auto": "🔄 Авто-выбор (Все модели)",
-            "gemini": "✨ Google Gemini",
-            "chatgpt": "🟢 ChatGPT (GPT-4o-mini)",
-            "deepseek": "🐋 DeepSeek V3",
-            "mistral": "🌪️ Mistral AI",
-            "llama": "🦙 Meta Llama 3.3 70B",
-        }
-        await inter.response.send_message(f"🤖 Активная модель ИИ переключена на: **{names.get(model, model)}**!", ephemeral=True)
-
-    @commands.slash_command(
-        contexts=GUILD_ONLY,
-        name="ai_reset",
-        description="Очистить память диалога с Aigis в текущем канале"
-    )
-    @commands.default_member_permissions(manage_messages=True)
-    async def ai_reset(self, inter: disnake.ApplicationCommandInteraction):
-        self.memory.pop(inter.channel_id, None)
-        await inter.response.send_message("♻️ Память диалога Aigis в этом канале очищена!", ephemeral=True)
-
-    @commands.slash_command(
-        contexts=GUILD_ONLY,
-        name="ai_toggle",
-        description="Включить или временно отключить ИИ-общение Aigis на сервере"
-    )
-    @commands.default_member_permissions(administrator=True)
-    async def ai_toggle(self, inter: disnake.ApplicationCommandInteraction):
-        cfg = await api.get_guild_config(str(inter.guild_id)) or {"guildId": str(inter.guild_id)}
-        cfg["guildId"] = str(inter.guild_id)
-
-        if inter.guild_id in self.disabled_guilds or cfg.get("aiEnabled") is False:
-            self.disabled_guilds.discard(inter.guild_id)
-            cfg["aiEnabled"] = True
-            await api.save_guild_config(cfg)
-            await inter.response.send_message("🟢 Модуль ИИ-общения Aigis **включен**!", ephemeral=True)
-        else:
-            self.disabled_guilds.add(inter.guild_id)
-            cfg["aiEnabled"] = False
-            await api.save_guild_config(cfg)
-            await inter.response.send_message("🔴 Модуль ИИ-общения Aigis **временно отключен**.", ephemeral=True)
+    async def ai_control_panel(self, inter: disnake.ApplicationCommandInteraction):
+        await inter.response.defer(ephemeral=True)
+        cfg = await self.get_ai_config(inter.guild_id)
+        view = AIControlPanelView(self, inter.author.id, inter.guild_id, inter.channel_id, cfg)
+        embed = await view.build_embed(inter.guild)
+        await inter.edit_original_response(embed=embed, view=view)
 
 
 def setup(bot: commands.Bot):

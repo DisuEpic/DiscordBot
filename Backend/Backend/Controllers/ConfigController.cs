@@ -64,8 +64,9 @@ public class ConfigController : ControllerBase
         config.AiCustomScenario = string.IsNullOrWhiteSpace(request.AiCustomScenario) ? null :
             request.AiCustomScenario.Trim();
         config.AiEnabled = request.AiEnabled ?? true;
-        config.AiMode = string.IsNullOrWhiteSpace(request?.AiMode) ? null :
+        config.AiMode = string.IsNullOrWhiteSpace(request.AiMode) ? null :
             request.AiMode.Trim();
+        config.AiProvider = string.IsNullOrWhiteSpace(request.AiProvider) ? "auto" : request.AiProvider!.Trim();
 
         await _context.SaveChangesAsync();
         return Ok(new { message = "Конфигурация сервера успешно сохранена!" });

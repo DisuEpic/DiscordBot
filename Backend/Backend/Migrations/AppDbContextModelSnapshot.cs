@@ -80,6 +80,9 @@ namespace DiscordBot_API.Migrations
                     b.Property<string>("AiMode")
                         .HasColumnType("text");
 
+                    b.Property<string>("AiProvider")
+                        .HasColumnType("text");
+
                     b.Property<string>("GuildId")
                         .IsRequired()
                         .HasMaxLength(32)

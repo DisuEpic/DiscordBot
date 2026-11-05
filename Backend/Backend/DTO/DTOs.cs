@@ -16,6 +16,7 @@ public record ConfigRequest(
     string? VoiceRoomTemplate = null,
     bool? AiEnabled = true,
     string? AiMode = "standard",
+    string? AiProvider = "auto",
     string? AiCustomScenario = null,
     string? AiCustomRules = null);
 

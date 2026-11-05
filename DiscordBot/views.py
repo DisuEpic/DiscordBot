@@ -51,7 +51,11 @@ class ConfirmResetView(disnake.ui.View):
             "trapChannelId": None,
             "welcomeTitle": None,
             "welcomeDescription": None,
-            "voiceGeneratorChannelId": None
+            "voiceGeneratorChannelId": None,
+            "aiEnabled": True, "aiMode": "standard", 
+            "aiProvider": "auto", 
+            "aiCustomScenario": None, 
+            "aiCustomRules": None
         }
 
         if await api.save_guild_config(reset_payload):

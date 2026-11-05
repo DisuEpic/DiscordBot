@@ -28,6 +28,7 @@ public class ServerConfig
     public string? AiMode { get; set; }
     public string? AiCustomScenario { get; set; }
     public string? AiCustomRules { get; set; }
+    public string? AiProvider { get; set; } = "auto";
 }
 
 [Table("Reactions")]
