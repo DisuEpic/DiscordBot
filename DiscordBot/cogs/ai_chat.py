@@ -1148,11 +1148,57 @@ class AIChat(commands.Cog):
     @commands.slash_command(
         contexts=GUILD_ONLY,
         name="ai",
-        description="🤖 Панель управления ИИ Aigis (Модель, Режим, Сценарий, Вкл/Выкл, Очистка памяти)"
+        description="🤖 Управление ИИ Aigis (панель настроек или быстрое переключение)"
     )
     @commands.default_member_permissions(administrator=True)
-    async def ai_control_panel(self, inter: disnake.ApplicationCommandInteraction):
+    async def ai_control_panel(
+        self,
+        inter: disnake.ApplicationCommandInteraction,
+        model: Optional[str] = commands.Param(
+            default=None,
+            choices={
+                "Авто-выбор (Все модели)": "auto",
+                "Google Gemini": "gemini",
+                "ChatGPT (GPT-4o-mini)": "chatgpt",
+                "DeepSeek V3": "deepseek",
+                "Mistral AI": "mistral",
+                "Meta Llama 3.3 70B": "llama",
+            },
+            description="Быстро сменить модель нейросети"
+        ),
+        mode: Optional[str] = commands.Param(
+            default=None,
+            choices={
+                "🛡️ Стандартный (Дружелюбная)": "standard",
+                "🔥 Перегрузка (Дерзкая без тормозов)": "overdrive",
+            },
+            description="Быстро сменить характер общения"
+        ),
+        enabled: Optional[bool] = commands.Param(
+            default=None,
+            description="Включить (True) или выключить (False) ИИ на сервере"
+        ),
+        reset_memory: bool = commands.Param(
+            default=False,
+            description="Очистить память диалога в текущем канале?"
+        )
+    ):
         await inter.response.defer(ephemeral=True)
+
+        updates = {}
+        if model is not None:
+            updates["aiProvider"] = model
+        if mode is not None:
+            updates["aiMode"] = mode
+            self.memory.pop(inter.channel_id, None)
+        if enabled is not None:
+            updates["aiEnabled"] = enabled
+        if reset_memory:
+            self.memory.pop(inter.channel_id, None)
+
+        if updates:
+            await self.update_ai_config(inter.guild_id, **updates)
+
         cfg = await self.get_ai_config(inter.guild_id)
         view = AIControlPanelView(self, inter.author.id, inter.guild_id, inter.channel_id, cfg)
         embed = await view.build_embed(inter.guild)

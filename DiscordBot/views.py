@@ -52,7 +52,8 @@ class ConfirmResetView(disnake.ui.View):
             "welcomeTitle": None,
             "welcomeDescription": None,
             "voiceGeneratorChannelId": None,
-            "aiEnabled": True, "aiMode": "standard", 
+            "aiEnabled": True, 
+            "aiMode": "standard", 
             "aiProvider": "auto", 
             "aiCustomScenario": None, 
             "aiCustomRules": None
