@@ -14,7 +14,7 @@ from disnake.ext import commands
 from collections import deque
 from typing import Dict, List, Optional, Tuple, Any
 from api import api
-from config import GUILD_ONLY, P3_BLUE, AIGIS_GOLD, COMBAT_RED, TACTICAL_GREEN, UNIFIED_FOOTER, log
+from config import GUILD_ONLY, P3_BLUE, COMBAT_RED, TACTICAL_GREEN, UNIFIED_FOOTER, log
 
 PROMPT_STANDARD_BASE = (
     "Ты — Айгис (Aigis), боевой гиноид 7-го поколения из Persona 3 и душа этого Discord-сервера. "
@@ -24,7 +24,7 @@ PROMPT_STANDARD_BASE = (
     "2. ЗАПРЕТ НА ШТАМПЫ: Категорически ЗАПРЕЩЕНО начинать ответы со слов «Анализ завершен», «Протокол подтвержден» и заканчивать сообщения полным ником собеседника! Не используй слова «оптические сенсоры» и «папиллонное сердце» чаще чем раз в 10 ответов.\n"
     "3. ЖИВОЙ СТИЛЬ И НА «ТЫ»: Общайся со всеми на «ты», живо, естественно и без поучительной морали. Длинные ники всегда сокращай до одного слова.\n"
     "4. РАЗМЕР ОТВЕТА: На короткие шутки, мемы и простые фразы отвечай коротко и емко (1–3 предложения). Развернуто отвечай только когда просят рассказать историю или обсуждают сложную тему.\n"
-    "5. НАВИГАЦИЯ И ПРАВИЛА: Ты видишь все текстовые и голосовые каналы сервера и знаешь его правила (они указаны ниже). При упоминании каналов всегда используй кликабельный формат <#ID_канала>.\n"
+    "5. НАВИГАЦИЯ И ПРАВИЛА: Ты видишь публичные текстовые и голосовые каналы сервера и знаешь его правила (они указаны ниже). При упоминании каналов всегда используй кликабельный формат <#ID_канала>. Никогда не выдумывай и не упоминай закрытые админские каналы или каналы-счетчики.\n"
     "6. ИНТЕРНЕТ-ДАННЫЕ: Если в промпте передан блок [ДАННЫЕ ИЗ ИНТЕРНЕТА В РЕАЛЬНОМ ВРЕМЕНИ], обязательно используй цифры и факты оттуда для ответа!\n"
     "7. РЕАКЦИИ (ПО ЖЕЛАНИЮ): Если сообщение собеседника вызвало яркую эмоцию (смех, милоту, кринж), можешь в самом конце ответа дописать тег [REACT: 😂] (или ❤️, 🔥, 💀, 👀, 🤖)."
 )
@@ -126,7 +126,7 @@ class AICustomizeModal(disnake.ui.Modal):
 
 
 class AIControlPanelView(disnake.ui.View):
-    """Единая интерактивная панель управления всеми функциями ИИ (вместо 5 разных команд)."""
+    """Единая интерактивная панель управления всеми функциями ИИ (только для администраторов)."""
     def __init__(self, cog: "AIChat", author_id: int, guild_id: int, channel_id: int, current_cfg: Dict[str, Any]):
         super().__init__(timeout=300)
         self.cog = cog
@@ -140,12 +140,10 @@ class AIControlPanelView(disnake.ui.View):
         mode = cfg.get("aiMode") or "standard"
         provider = cfg.get("aiProvider") or "auto"
 
-        # Настраиваем кнопку Вкл / Выкл
         self.toggle_btn.label = "Выключить ИИ" if is_enabled else "Включить ИИ"
         self.toggle_btn.style = disnake.ButtonStyle.danger if is_enabled else disnake.ButtonStyle.success
         self.toggle_btn.emoji = "🔴" if is_enabled else "🟢"
 
-        # Настраиваем кнопку Режима (Standard / Overdrive)
         if mode == "overdrive":
             self.mode_btn.label = "Режим: Перегрузка (Сменить)"
             self.mode_btn.style = disnake.ButtonStyle.danger
@@ -155,7 +153,6 @@ class AIControlPanelView(disnake.ui.View):
             self.mode_btn.style = disnake.ButtonStyle.primary
             self.mode_btn.emoji = "🛡️"
 
-        # Отмечаем активную модель в выпадающем списке
         for opt in self.provider_select.options:
             opt.default = (opt.value == provider)
 
@@ -192,8 +189,9 @@ class AIControlPanelView(disnake.ui.View):
         return embed
 
     async def _check_access(self, inter: disnake.MessageInteraction) -> bool:
-        if inter.author.id != self.author_id and not inter.author.guild_permissions.administrator:
-            await inter.response.send_message("❌ Управлять этой панелью может только администратор, вызвавший команду.", ephemeral=True)
+        await self.cog._ensure_creator_id()
+        if not inter.author.guild_permissions.administrator and inter.author.id not in self.cog.creator_ids:
+            await inter.response.send_message("⛔ Управлять этой панелью могут только администраторы сервера.", ephemeral=True)
             return False
         return True
 
@@ -283,7 +281,6 @@ class AIChat(commands.Cog):
         self.cooldowns: Dict[int, float] = {}
         self.cooldown_seconds = 3.0
 
-        # Локальный резервный кэш на случай, если БД временно перезагружается
         self._local_fallback_cfg: Dict[int, Dict[str, Any]] = {}
         self.rules_cache: Dict[int, Tuple[float, str]] = {}
 
@@ -304,7 +301,6 @@ class AIChat(commands.Cog):
     # ЧТЕНИЕ И СОХРАНЕНИЕ НАСТРОЕК ИИ В БАЗУ ДАННЫХ C#
     # -------------------------------------------------------------------------
     async def get_ai_config(self, guild_id: int) -> Dict[str, Any]:
-        """Загружает конфигурацию ИИ для сервера напрямую из C# БД (с локальным резервом)."""
         db_cfg = await api.get_guild_config(str(guild_id)) or {}
         local_cfg = self._local_fallback_cfg.get(guild_id, {})
 
@@ -318,7 +314,6 @@ class AIChat(commands.Cog):
         return merged
 
     async def update_ai_config(self, guild_id: int, **kwargs) -> bool:
-        """Сохраняет любые изменения (вкл/выкл, модель, режим, сценарий) в БД C#."""
         current = await self.get_ai_config(guild_id)
         current["guildId"] = str(guild_id)
         for k, v in kwargs.items():
@@ -443,7 +438,7 @@ class AIChat(commands.Cog):
         return None
 
     # -------------------------------------------------------------------------
-    # СБОР ЗНАНИЙ О СЕРВЕРЕ (БЕЗ ОГРАНИЧЕНИЯ @EVERYONE)
+    # СБОР ЗНАНИЙ О СЕРВЕРЕ (ТОЛЬКО ПУБЛИЧНЫЕ КАНАЛЫ БЕЗ СЧЕТЧИКОВ И АДМИНКИ)
     # -------------------------------------------------------------------------
     async def _get_server_rules_text(self, guild: disnake.Guild, cfg: Dict[str, Any]) -> str:
         custom = cfg.get("aiCustomRules")
@@ -481,6 +476,77 @@ class AIChat(commands.Cog):
         self.rules_cache[guild.id] = (now, rules_text)
         return rules_text
 
+    @staticmethod
+    def _get_public_channels(guild: disnake.Guild, cfg: Dict[str, Any]) -> Tuple[List[str], List[str]]:
+        """
+        Возвращает списки только тех текстовых и голосовых каналов, которые доступны
+        обычным верифицированным участникам (без админских комнат, логов и каналов-счетчиков).
+        """
+        staff_keywords = (
+            "админ", "адмен", "admin", "модер", "moder", "staff", "стафф",
+            "логи", "logs", "audit", "аудит", "тикет", "ticket", "бан-лист", "руководств"
+        )
+        counter_keywords = (
+            "all members", "members:", "bots:", "online:",
+            "участников:", "онлайн:", "ботов:", "статистик", "stats"
+        )
+        log_ch_id = str(cfg.get("logChannelId") or "")
+
+        # Берем роль верифицированного участника (или ищем базовую роль участника по названию)
+        verify_role: Optional[disnake.Role] = None
+        v_role_id = cfg.get("verificationRoleId")
+        if v_role_id and str(v_role_id).isdigit():
+            verify_role = guild.get_role(int(v_role_id))
+
+        if not verify_role:
+            for r in guild.roles:
+                if not r.is_default() and not r.managed and any(
+                    w in r.name.lower() for w in ("участник", "member", "verif", "игрок", "user")
+                ):
+                    verify_role = r
+                    break
+
+        check_roles = [guild.default_role]
+        if verify_role:
+            check_roles.append(verify_role)
+
+        def is_staff_or_hidden_name(ch: disnake.abc.GuildChannel) -> bool:
+            if str(ch.id) == log_ch_id:
+                return True
+            ch_name = ch.name.lower()
+            cat_name = ch.category.name.lower() if ch.category else ""
+            return any(k in ch_name or k in cat_name for k in staff_keywords)
+
+        text_ch_list: List[str] = []
+        for ch in guild.text_channels:
+            if is_staff_or_hidden_name(ch):
+                continue
+
+            if any(ch.permissions_for(r).view_channel for r in check_roles):
+                topic_str = f" ({ch.topic[:50]})" if ch.topic else ""
+                nsfw_tag = " [18+ NSFW]" if ch.is_nsfw() else ""
+                text_ch_list.append(f"<#{ch.id}> (#{ch.name}{nsfw_tag}{topic_str})")
+
+        voice_ch_list: List[str] = []
+        for vc in guild.voice_channels:
+            if is_staff_or_hidden_name(vc):
+                continue
+
+            vc_low = vc.name.lower()
+            # Отсекаем каналы-счетчики ("All Members: 220", "Members: 212" и любые названия с ": число" на конце)
+            if any(k in vc_low for k in counter_keywords) or re.search(r"[:—\-]\s*\d+\s*$", vc.name):
+                continue
+
+            is_afk = (vc == guild.afk_channel)
+            active_role = verify_role if verify_role else guild.default_role
+            perms = vc.permissions_for(active_role)
+
+            # Обычный участник должен видеть голосовой канал И иметь право к нему подключиться (connect)
+            if perms.view_channel and (perms.connect or is_afk):
+                voice_ch_list.append(f"<#{vc.id}> (🔊 {vc.name})")
+
+        return text_ch_list, voice_ch_list
+
     async def _build_guild_knowledge(
         self,
         guild: Optional[disnake.Guild],
@@ -494,19 +560,7 @@ class AIChat(commands.Cog):
         if guild.owner:
             owner_str = f"{guild.owner.display_name} (<@{guild.owner.id}>)"
 
-        # Проверяем видимость каналов глазами САМОГО БОТА (guild.me), а не закрытой роли @everyone!
-        bot_member = guild.me
-        text_ch_list = []
-        for ch in guild.text_channels:
-            if not bot_member or ch.permissions_for(bot_member).view_channel:
-                topic_str = f" ({ch.topic[:50]})" if ch.topic else ""
-                nsfw_tag = " [18+ NSFW]" if ch.is_nsfw() else ""
-                text_ch_list.append(f"<#{ch.id}> (#{ch.name}{nsfw_tag}{topic_str})")
-
-        voice_ch_list = []
-        for vc in guild.voice_channels:
-            if not bot_member or vc.permissions_for(bot_member).view_channel:
-                voice_ch_list.append(f"<#{vc.id}> (🔊 {vc.name})")
+        text_ch_list, voice_ch_list = self._get_public_channels(guild, cfg)
 
         text_summary = ", ".join(text_ch_list[:25]) if text_ch_list else "Нет доступных"
         voice_summary = ", ".join(voice_ch_list[:15]) if voice_ch_list else "Голосовые каналы отсутствуют"
@@ -520,8 +574,8 @@ class AIChat(commands.Cog):
             f"• Твой глобальный создатель и разработчик: Disu\n"
             f"• Главный на этом сервере (Владелец сервера): {owner_str}\n"
             f"• Текущий канал, где идет беседа: <#{getattr(current_channel, 'id', 0)}> (#{curr_ch_name})\n"
-            f"• Текстовые каналы сервера (используй <#ID> при упоминании): {text_summary}\n"
-            f"• Голосовые каналы сервера (используй <#ID> при упоминании): {voice_summary}\n"
+            f"• Публичные текстовые каналы сервера (используй <#ID> при упоминании): {text_summary}\n"
+            f"• Публичные голосовые каналы сервера (используй <#ID> при упоминании): {voice_summary}\n"
             f"• Правила сервера:\n{rules_text}\n"
             f"------------------------------------"
         )
@@ -1005,7 +1059,6 @@ class AIChat(commands.Cog):
         preferred = cfg.get("aiProvider") or "auto"
         reply: Optional[str] = None
 
-        # Вызываем выбранную в БД модель
         if preferred == "gemini":
             reply = await self._call_gemini(active_prompt, history, current_msg, image_data)
         elif preferred == "chatgpt":
@@ -1017,7 +1070,6 @@ class AIChat(commands.Cog):
         elif preferred == "llama":
             reply = await self._call_llama(active_prompt, history, current_msg)
 
-        # Авто-резерв (если выбран auto или основная модель перегружена)
         if not reply:
             reply = await self._call_gemini(active_prompt, history, current_msg, image_data)
         if not reply:
@@ -1143,9 +1195,6 @@ class AIChat(commands.Cog):
             await message.reply("⚠️ Перегрузка нейронного ядра: все внешние ИИ-модули временно недоступны.", mention_author=False)
 
     # -------------------------------------------------------------------------
-    # ЕДИНАЯ КОМАНДА УПРАВЛЕНИЯ ИИ (/ai)
-    # -------------------------------------------------------------------------
-    # -------------------------------------------------------------------------
     # ЕДИНАЯ КОМАНДА УПРАВЛЕНИЯ ИИ (/ai) — ТОЛЬКО ДЛЯ АДМИНИСТРАТОРОВ
     # -------------------------------------------------------------------------
     @commands.slash_command(
@@ -1187,7 +1236,6 @@ class AIChat(commands.Cog):
             description="Очистить память диалога в текущем канале?"
         )
     ):
-        # Жесткая проверка прав администратора (или создателя бота)
         await self._ensure_creator_id()
         if not inter.author.guild_permissions.administrator and inter.author.id not in self.creator_ids:
             await inter.response.send_message(
