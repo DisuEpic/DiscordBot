@@ -24,6 +24,10 @@ public class ServerConfig
     public string? WelcomeDescription { get; set; }
     public string? VoiceGeneratorChannelId { get; set; }
     public string? VoiceRoomTemplate { get; set; }
+    public bool AiEnabled { get; set; } = true;
+    public string? AiMode { get; set; }
+    public string? AiCustomScenario { get; set; }
+    public string? AiCustomRules { get; set; }
 }
 
 [Table("Reactions")]

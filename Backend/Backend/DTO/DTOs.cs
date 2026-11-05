@@ -13,7 +13,11 @@ public record ConfigRequest(
     string? WelcomeTitle,
     string? WelcomeDescription,
     string? VoiceGeneratorChannelId,
-    string? VoiceRoomTemplate = null);
+    string? VoiceRoomTemplate = null,
+    bool? AiEnabled = true,
+    string? AiMode = "standard",
+    string? AiCustomScenario = null,
+    string? AiCustomRules = null);
 
 public record ReactionRoleRequest(string GuildId, string Category, string Emoji, string RoleId, string Name);
 

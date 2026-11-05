@@ -13,8 +13,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace DiscordBot_API.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20261026145710_AddWelcomeAndVoiceConfig")]
-    partial class AddWelcomeAndVoiceConfig
+    [Migration("20261105102157_AiSettings")]
+    partial class AiSettings
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -71,6 +71,18 @@ namespace DiscordBot_API.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("AiCustomRules")
+                        .HasColumnType("text");
+
+                    b.Property<string>("AiCustomScenario")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("AiEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("AiMode")
+                        .HasColumnType("text");
+
                     b.Property<string>("GuildId")
                         .IsRequired()
                         .HasMaxLength(32)
@@ -88,9 +100,21 @@ namespace DiscordBot_API.Migrations
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)");
 
+                    b.Property<string>("VoiceGeneratorChannelId")
+                        .HasColumnType("text");
+
+                    b.Property<string>("VoiceRoomTemplate")
+                        .HasColumnType("text");
+
                     b.Property<string>("WelcomeChannelId")
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)");
+
+                    b.Property<string>("WelcomeDescription")
+                        .HasColumnType("text");
+
+                    b.Property<string>("WelcomeTitle")
+                        .HasColumnType("text");
 
                     b.HasKey("Id");
 

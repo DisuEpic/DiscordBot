@@ -59,6 +59,13 @@ public class ConfigController : ControllerBase
         config.WelcomeDescription = request.WelcomeDescription;
         config.VoiceRoomTemplate = string.IsNullOrWhiteSpace(request.VoiceRoomTemplate) ? null :
             request.VoiceRoomTemplate.Trim();
+        config.AiCustomRules = string.IsNullOrWhiteSpace(request.AiCustomRules) ? null :
+            request.AiCustomRules.Trim();
+        config.AiCustomScenario = string.IsNullOrWhiteSpace(request.AiCustomScenario) ? null :
+            request.AiCustomScenario.Trim();
+        config.AiEnabled = request.AiEnabled ?? true;
+        config.AiMode = string.IsNullOrWhiteSpace(request?.AiMode) ? null :
+            request.AiMode.Trim();
 
         await _context.SaveChangesAsync();
         return Ok(new { message = "Конфигурация сервера успешно сохранена!" });

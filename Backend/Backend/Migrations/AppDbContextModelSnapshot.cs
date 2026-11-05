@@ -68,6 +68,18 @@ namespace DiscordBot_API.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("AiCustomRules")
+                        .HasColumnType("text");
+
+                    b.Property<string>("AiCustomScenario")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("AiEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("AiMode")
+                        .HasColumnType("text");
+
                     b.Property<string>("GuildId")
                         .IsRequired()
                         .HasMaxLength(32)
