@@ -18,10 +18,137 @@ namespace DiscordBot_API.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "8.0.32")
+                .HasAnnotation("ProductVersion", "8.0.34")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
+
+            modelBuilder.Entity("DiscordBot_API.Models.GuildAiConfig", b =>
+                {
+                    b.Property<string>("GuildId")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("CustomRules")
+                        .HasColumnType("text");
+
+                    b.Property<string>("CustomScenario")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Mode")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.HasKey("GuildId");
+
+                    b.ToTable("GuildAiConfigs");
+                });
+
+            modelBuilder.Entity("DiscordBot_API.Models.GuildCoreConfig", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("GuildId")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<bool>("IsPremium")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("LogChannelId")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<DateTime?>("PremiumUntil")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GuildId")
+                        .IsUnique();
+
+                    b.ToTable("GuildCoreConfigs");
+                });
+
+            modelBuilder.Entity("DiscordBot_API.Models.GuildSecurityConfig", b =>
+                {
+                    b.Property<string>("GuildId")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<bool>("AutoKickUnverified")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("TrapChannelId")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<bool>("UseCaptcha")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("VerificationRoleId")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<int>("VerifyTimeoutMinutes")
+                        .HasColumnType("integer");
+
+                    b.HasKey("GuildId");
+
+                    b.ToTable("GuildSecurityConfigs");
+                });
+
+            modelBuilder.Entity("DiscordBot_API.Models.GuildVoiceConfig", b =>
+                {
+                    b.Property<string>("GuildId")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("GeneratorChannelId")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("RoomTemplate")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.HasKey("GuildId");
+
+                    b.ToTable("GuildVoiceConfigs");
+                });
+
+            modelBuilder.Entity("DiscordBot_API.Models.GuildWelcomeConfig", b =>
+                {
+                    b.Property<string>("GuildId")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("ChannelId")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Title")
+                        .HasColumnType("text");
+
+                    b.HasKey("GuildId");
+
+                    b.ToTable("GuildWelcomeConfigs");
+                });
 
             modelBuilder.Entity("DiscordBot_API.Models.ReactionRole", b =>
                 {
@@ -156,6 +283,57 @@ namespace DiscordBot_API.Migrations
                         .IsUnique();
 
                     b.ToTable("Users");
+                });
+
+            modelBuilder.Entity("DiscordBot_API.Models.GuildAiConfig", b =>
+                {
+                    b.HasOne("DiscordBot_API.Models.GuildCoreConfig", null)
+                        .WithOne("Ai")
+                        .HasForeignKey("DiscordBot_API.Models.GuildAiConfig", "GuildId")
+                        .HasPrincipalKey("DiscordBot_API.Models.GuildCoreConfig", "GuildId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("DiscordBot_API.Models.GuildSecurityConfig", b =>
+                {
+                    b.HasOne("DiscordBot_API.Models.GuildCoreConfig", null)
+                        .WithOne("Security")
+                        .HasForeignKey("DiscordBot_API.Models.GuildSecurityConfig", "GuildId")
+                        .HasPrincipalKey("DiscordBot_API.Models.GuildCoreConfig", "GuildId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("DiscordBot_API.Models.GuildVoiceConfig", b =>
+                {
+                    b.HasOne("DiscordBot_API.Models.GuildCoreConfig", null)
+                        .WithOne("Voice")
+                        .HasForeignKey("DiscordBot_API.Models.GuildVoiceConfig", "GuildId")
+                        .HasPrincipalKey("DiscordBot_API.Models.GuildCoreConfig", "GuildId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("DiscordBot_API.Models.GuildWelcomeConfig", b =>
+                {
+                    b.HasOne("DiscordBot_API.Models.GuildCoreConfig", null)
+                        .WithOne("Welcome")
+                        .HasForeignKey("DiscordBot_API.Models.GuildWelcomeConfig", "GuildId")
+                        .HasPrincipalKey("DiscordBot_API.Models.GuildCoreConfig", "GuildId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("DiscordBot_API.Models.GuildCoreConfig", b =>
+                {
+                    b.Navigation("Ai");
+
+                    b.Navigation("Security");
+
+                    b.Navigation("Voice");
+
+                    b.Navigation("Welcome");
                 });
 #pragma warning restore 612, 618
         }
