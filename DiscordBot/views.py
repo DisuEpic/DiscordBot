@@ -4,15 +4,23 @@ from api import api
 from utils import parse_emoji, add_chunked_role_fields
 from config import P3_BLUE, UNIFIED_FOOTER
 
+
 class VerifyView(disnake.ui.View):
-    def __init__(self, button_label: str = "Пройти верификацию", button_emoji: str = "✅"):
+    def __init__(
+        self,
+        button_label: str = "Пройти верификацию",
+        button_emoji: str = "✅",
+        use_captcha: bool = False
+    ):
         super().__init__(timeout=None)
+        custom_id = "persistent_verify_captcha" if use_captcha else "persistent_verify_button"
         self.add_item(disnake.ui.Button(
             label=button_label,
             style=disnake.ButtonStyle.success,
             emoji=parse_emoji(button_emoji) or "✅",
-            custom_id="persistent_verify_button"
+            custom_id=custom_id
         ))
+
 
 def build_role_buttons_view(
     roles_subset: List[Dict[str, Any]],
@@ -31,6 +39,7 @@ def build_role_buttons_view(
         ))
     return view
 
+
 class ConfirmResetView(disnake.ui.View):
     def __init__(self, author_id: int):
         super().__init__(timeout=30)
@@ -43,23 +52,7 @@ class ConfirmResetView(disnake.ui.View):
             return
 
         await inter.response.defer()
-        reset_payload = {
-            "guildId": str(inter.guild_id),
-            "verificationRoleId": None,
-            "welcomeChannelId": None,
-            "logChannelId": None,
-            "trapChannelId": None,
-            "welcomeTitle": None,
-            "welcomeDescription": None,
-            "voiceGeneratorChannelId": None,
-            "aiEnabled": True, 
-            "aiMode": "standard", 
-            "aiProvider": "auto", 
-            "aiCustomScenario": None, 
-            "aiCustomRules": None
-        }
-
-        if await api.save_guild_config(reset_payload):
+        if await api.reset_guild_config(str(inter.guild_id)):
             await inter.edit_original_response(
                 content="♻️ Все настройки сервера полностью сброшены к начальным.",
                 embed=None,
@@ -79,6 +72,7 @@ class ConfirmResetView(disnake.ui.View):
             return
         await inter.response.edit_message(content=None, view=SettingsDashboardView(self.author_id))
 
+
 class SettingsDashboardView(disnake.ui.View):
     def __init__(self, author_id: int):
         super().__init__(timeout=180)
@@ -91,8 +85,10 @@ class SettingsDashboardView(disnake.ui.View):
             disnake.SelectOption(label="Отключить канал приветствий", value="welcomeChannelId", emoji="👋"),
             disnake.SelectOption(label="Отключить канал аудита (логов)", value="logChannelId", emoji="📜"),
             disnake.SelectOption(label="Отключить приватные войсы", value="voiceGeneratorChannelId", emoji="🔊"),
+            disnake.SelectOption(label="Сбросить шаблон имени войсов", value="voiceRoomTemplate", emoji="🏷️"),
             disnake.SelectOption(label="Отключить канал-ловушку (Тишина)", value="trapChannelId", emoji="🤫"),
             disnake.SelectOption(label="Сбросить текст шаблона приветствия", value="welcomeText", emoji="📝"),
+            disnake.SelectOption(label="Сбросить настройки ИИ к стандартным", value="aiReset", emoji="🤖"),
         ]
     )
     async def remove_single_config(self, select: disnake.ui.Select, inter: disnake.MessageInteraction):
@@ -103,7 +99,6 @@ class SettingsDashboardView(disnake.ui.View):
         await inter.response.defer(ephemeral=True)
         guild_id = str(inter.guild_id)
         cfg = await api.get_guild_config(guild_id) or {}
-        cfg["guildId"] = guild_id
 
         choice = select.values[0]
         labels_map = {
@@ -111,17 +106,46 @@ class SettingsDashboardView(disnake.ui.View):
             "welcomeChannelId": "👋 Канал приветствий отключен.",
             "logChannelId": "📜 Канал аудита (логов) отключен.",
             "voiceGeneratorChannelId": "🔊 Создание приватных голосовых комнат отключено.",
+            "voiceRoomTemplate": "🏷️ Шаблон имени приватных войсов сброшен.",
             "trapChannelId": "🤫 Канал-ловушка (Тишина) отключен.",
-            "welcomeText": "📝 Текст приветствия сброшен к стандартному."
+            "welcomeText": "📝 Текст приветствия сброшен к стандартному.",
+            "aiReset": "🤖 Настройки ИИ сброшены к стандартным."
         }
 
-        if choice == "welcomeText":
-            cfg["welcomeTitle"] = None
-            cfg["welcomeDescription"] = None
-        else:
-            cfg[choice] = None
+        ok = False
+        if choice in ("verificationRoleId", "trapChannelId"):
+            sec = dict(cfg.get("security") or {})
+            sec[choice] = None
+            ok = await api.update_security_config(guild_id, sec)
+        elif choice == "welcomeChannelId":
+            wel = dict(cfg.get("welcome") or {})
+            wel["channelId"] = None
+            ok = await api.update_welcome_config(guild_id, wel)
+        elif choice == "welcomeText":
+            wel = dict(cfg.get("welcome") or {})
+            wel["title"] = None
+            wel["description"] = None
+            ok = await api.update_welcome_config(guild_id, wel)
+        elif choice == "logChannelId":
+            ok = await api.update_general_config(guild_id, None)
+        elif choice == "voiceGeneratorChannelId":
+            voi = dict(cfg.get("voice") or {})
+            voi["generatorChannelId"] = None
+            ok = await api.update_voice_config(guild_id, voi)
+        elif choice == "voiceRoomTemplate":
+            voi = dict(cfg.get("voice") or {})
+            voi["roomTemplate"] = None
+            ok = await api.update_voice_config(guild_id, voi)
+        elif choice == "aiReset":
+            ok = await api.update_ai_config(guild_id, {
+                "enabled": True,
+                "mode": "standard",
+                "provider": "auto",
+                "customScenario": None,
+                "customRules": None,
+            })
 
-        if await api.save_guild_config(cfg):
+        if ok:
             await inter.followup.send(f"✅ {labels_map.get(choice, 'Параметр сброшен.')} Вызовите `/settings`, чтобы обновить панель.", ephemeral=True)
         else:
             await inter.followup.send("❌ Не удалось сохранить настройки: API недоступен.", ephemeral=True)

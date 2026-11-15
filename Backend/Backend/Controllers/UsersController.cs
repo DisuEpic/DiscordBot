@@ -130,7 +130,7 @@ public class UsersController : ControllerBase
             return NotFound(new { message = "Пользователь не найден в базе данных" });
         }
         users.IsVerified = false;
-        users.Roles.Clear();
+        users.Roles = new List<string>();
         await _context.SaveChangesAsync();
         return Ok(new { message = " Верификация пользователя аннулирована, профиль сброшен." });
     }

@@ -5,6 +5,7 @@ from api import api
 from utils import check_moderation_target, send_log
 from config import GUILD_ONLY, AIGIS_GOLD, COMBAT_RED, TACTICAL_GREEN, UNIFIED_FOOTER
 
+
 class Moderation(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -15,7 +16,7 @@ class Moderation(commands.Cog):
         await inter.response.defer(ephemeral=True)
         channel = inter.channel
         guild_config = await api.get_guild_config(str(inter.guild_id)) or {}
-        role_id = guild_config.get("verificationRoleId")
+        role_id = (guild_config.get("security") or {}).get("verificationRoleId")
         target_role = (inter.guild.get_role(int(role_id)) if role_id else None) or inter.guild.default_role
 
         try:
@@ -40,7 +41,7 @@ class Moderation(commands.Cog):
         await inter.response.defer(ephemeral=True)
         channel = inter.channel
         guild_config = await api.get_guild_config(str(inter.guild_id)) or {}
-        role_id = guild_config.get("verificationRoleId")
+        role_id = (guild_config.get("security") or {}).get("verificationRoleId")
         target_role = (inter.guild.get_role(int(role_id)) if role_id else None) or inter.guild.default_role
 
         try:
@@ -213,6 +214,7 @@ class Moderation(commands.Cog):
             await inter.edit_original_response(content="⚠️ У бота нет прав на чтение истории или удаление сообщений в этом канале.")
         except disnake.HTTPException as e:
             await inter.edit_original_response(content=f"❌ Ошибка Discord API при очистке сообщений: {e}")
+
 
 def setup(bot: commands.Bot):
     bot.add_cog(Moderation(bot))

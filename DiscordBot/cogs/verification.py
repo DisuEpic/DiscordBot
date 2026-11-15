@@ -1,4 +1,5 @@
 import time
+import random
 import asyncio
 import disnake
 from disnake.ext import commands, tasks
@@ -15,6 +16,40 @@ from config import (
     TACTICAL_GREEN, COMBAT_RED, UNIFIED_FOOTER, log
 )
 
+
+class CaptchaModal(disnake.ui.Modal):
+    """Интерактивная капча во всплывающем окне при нажатии на кнопку верификации."""
+    def __init__(self, cog: "Verification"):
+        self.cog = cog
+        alphabet = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"
+        self.expected_code = "".join(random.choices(alphabet, k=5))
+
+        components = [
+            disnake.ui.TextInput(
+                label=f"Введите проверочный код: {self.expected_code}",
+                placeholder=f"Напишите сюда: {self.expected_code}",
+                custom_id="captcha_input",
+                style=disnake.TextInputStyle.short,
+                min_length=5,
+                max_length=5,
+                required=True,
+            )
+        ]
+        super().__init__(title="🛡️ Защита от ботов (Aigis Captcha)", components=components)
+
+    async def callback(self, inter: disnake.ModalInteraction):
+        user_input = inter.text_values.get("captcha_input", "").strip().upper()
+        if user_input != self.expected_code:
+            await inter.response.send_message(
+                f"❌ Неверный код (`{user_input}` ≠ `{self.expected_code}`). Нажмите на кнопку верификации и попробуйте еще раз!",
+                ephemeral=True
+            )
+            return
+
+        await inter.response.defer(ephemeral=True)
+        await self.cog._complete_verification(inter, respond_ephemeral=True)
+
+
 class Verification(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -24,21 +59,23 @@ class Verification(commands.Cog):
     def cog_unload(self):
         self.check_unverified_members.cancel()
 
-    @commands.Cog.listener("on_button_click")
-    async def on_verify_button(self, inter: disnake.MessageInteraction):
-        if inter.component.custom_id != "persistent_verify_button":
-            return
-
-        await inter.response.defer()
+    async def _complete_verification(
+        self,
+        inter: disnake.Interaction,
+        respond_ephemeral: bool = False
+    ):
         guild_id = str(inter.guild_id)
         user_id = str(inter.author.id)
 
         guild_config = await api.get_guild_config(guild_id)
-        if not guild_config or not guild_config.get("verificationRoleId"):
+        sec_cfg = (guild_config or {}).get("security") or {}
+        verify_role_id = sec_cfg.get("verificationRoleId")
+
+        if not verify_role_id or not str(verify_role_id).isdigit():
             await inter.followup.send("❌ Роль верификации еще не настроена администрацией.", ephemeral=True)
             return
 
-        verify_role = inter.guild.get_role(int(guild_config["verificationRoleId"]))
+        verify_role = inter.guild.get_role(int(verify_role_id))
         if not verify_role:
             await inter.followup.send("⚠️ Роль верификации не найдена на сервере.", ephemeral=True)
             return
@@ -65,6 +102,8 @@ class Verification(commands.Cog):
 
         was_already_verified = verify_role in inter.author.roles
         if was_already_verified and not roles_to_give:
+            if respond_ephemeral:
+                await inter.followup.send("✅ Вы уже верифицированы на сервере!", ephemeral=True)
             return
 
         success = await api.verify_user(guild_id, user_id)
@@ -76,12 +115,14 @@ class Verification(commands.Cog):
             await inter.author.add_roles(*roles_to_give, reason="Верификация и восстановление ролей из БД")
             roles_mentions = ", ".join(r.mention for r in roles_to_give)
 
+            if respond_ephemeral:
+                await inter.followup.send("✅ Проверка пройдена! Доступ к серверу открыт.", ephemeral=True)
+
             if was_already_verified:
                 return
 
-            # Отправляем приветственную карточку при успешной первичной верификации
             extra_restored = [r for r in roles_to_give if r != verify_role]
-            await send_welcome_card(inter.author, guild_config, extra_roles=extra_restored)
+            await send_welcome_card(inter.author, guild_config or {}, extra_roles=extra_restored)
 
             log_embed = disnake.Embed(
                 title="✅ Участник верифицирован",
@@ -98,6 +139,26 @@ class Verification(commands.Cog):
 
         except disnake.Forbidden:
             await inter.followup.send("⚠️ Ошибка прав: роль бота должна стоять выше выдаваемых ролей.", ephemeral=True)
+
+    @commands.Cog.listener("on_button_click")
+    async def on_verify_button(self, inter: disnake.MessageInteraction):
+        cid = inter.component.custom_id
+        if cid not in ("persistent_verify_button", "persistent_verify_captcha"):
+            return
+
+        guild_config = await api.get_guild_config(str(inter.guild_id))
+        verify_role_id = ((guild_config or {}).get("security") or {}).get("verificationRoleId")
+        if verify_role_id and str(verify_role_id).isdigit():
+            v_role = inter.guild.get_role(int(verify_role_id))
+            if v_role and v_role in inter.author.roles:
+                await inter.response.send_message("✅ Вы уже прошли верификацию!", ephemeral=True)
+                return
+
+        if cid == "persistent_verify_captcha":
+            await inter.response.send_modal(CaptchaModal(self))
+        else:
+            await inter.response.defer()
+            await self._complete_verification(inter, respond_ephemeral=False)
 
     @commands.slash_command(
         contexts=GUILD_ONLY,
@@ -171,13 +232,13 @@ class Verification(commands.Cog):
     ):
         await inter.response.defer(ephemeral=True)
         guild_id = str(inter.guild_id)
-        cfg = await api.get_guild_config(guild_id) or {"guildId": guild_id}
-        cfg["guildId"] = guild_id
+        cfg = await api.get_guild_config(guild_id) or {}
+        wel = dict(cfg.get("welcome") or {})
 
         if reset_to_default:
-            cfg["welcomeTitle"] = None
-            cfg["welcomeDescription"] = None
-            if await api.save_guild_config(cfg):
+            wel["title"] = None
+            wel["description"] = None
+            if await api.update_welcome_config(guild_id, wel):
                 await inter.edit_original_response(content="♻️ Приветствие в базе данных сброшено к стандартному тексту.")
             else:
                 await inter.edit_original_response(content="❌ Ошибка сохранения в БД.")
@@ -188,16 +249,16 @@ class Verification(commands.Cog):
             return
 
         if title:
-            cfg["welcomeTitle"] = title
+            wel["title"] = title
         if description:
-            cfg["welcomeDescription"] = description
+            wel["description"] = description
 
-        if not await api.save_guild_config(cfg):
+        if not await api.update_welcome_config(guild_id, wel):
             await inter.edit_original_response(content="❌ Не удалось сохранить шаблон приветствия в базу данных.")
             return
 
-        sample_title = (cfg.get("welcomeTitle") or DEFAULT_WELCOME_TITLE).replace("{user}", inter.author.display_name).replace("{server}", inter.guild.name)
-        sample_desc = (cfg.get("welcomeDescription") or DEFAULT_WELCOME_DESC).replace("{user}", inter.author.mention).replace("{server}", inter.guild.name)
+        sample_title = (wel.get("title") or DEFAULT_WELCOME_TITLE).replace("{user}", inter.author.display_name).replace("{server}", inter.guild.name)
+        sample_desc = (wel.get("description") or DEFAULT_WELCOME_DESC).replace("{user}", inter.author.mention).replace("{server}", inter.guild.name)
 
         preview_embed = disnake.Embed(title=f"Предпросмотр: {sample_title}", description=sample_desc, color=TACTICAL_GREEN)
         preview_embed.set_thumbnail(url=inter.author.display_avatar.url)
@@ -213,12 +274,19 @@ class Verification(commands.Cog):
         now = disnake.utils.utcnow()
         for guild in self.bot.guilds:
             cfg = await api.get_guild_config(str(guild.id))
-            if not cfg or not cfg.get("verificationRoleId"):
+            sec = (cfg or {}).get("security") or {}
+            if not sec.get("autoKickUnverified", False):
                 continue
 
-            verify_role = guild.get_role(int(cfg["verificationRoleId"]))
+            verify_role_id = sec.get("verificationRoleId")
+            if not verify_role_id or not str(verify_role_id).isdigit():
+                continue
+
+            verify_role = guild.get_role(int(verify_role_id))
             if not verify_role:
                 continue
+
+            timeout_mins = sec.get("verifyTimeoutMinutes") or VERIFY_TIMEOUT_MINUTES
 
             for member in list(guild.members):
                 if member.bot or member.guild_permissions.administrator:
@@ -232,14 +300,14 @@ class Verification(commands.Cog):
 
                 waiting_since = max(member.joined_at, self.started_at)
                 minutes_waiting = (now - waiting_since).total_seconds() / 60
-                if minutes_waiting >= VERIFY_TIMEOUT_MINUTES:
+                if minutes_waiting >= timeout_mins:
                     try:
                         try:
                             dm_embed = disnake.Embed(
                                 title="⏳ Превышен лимит ожидания верификации",
                                 description=(
                                     f"Здравствуйте, **{member.display_name}**.\n\n"
-                                    f"Время на прохождение верификации на сервере **{guild.name}** ({VERIFY_TIMEOUT_MINUTES} мин.) истекло.\n"
+                                    f"Время на прохождение верификации на сервере **{guild.name}** ({timeout_mins} мин.) истекло.\n"
                                     f"Вы были исключены с сервера. Вы можете зайти снова и подтвердить профиль вовремя."
                                 ),
                                 color=COMBAT_RED
@@ -249,13 +317,13 @@ class Verification(commands.Cog):
                         except disnake.Forbidden:
                             pass
 
-                        await member.kick(reason=f"Не прошел верификацию за {VERIFY_TIMEOUT_MINUTES} минут")
+                        await member.kick(reason=f"Не прошел верификацию за {timeout_mins} минут")
 
                         log_embed = disnake.Embed(
                             title="⏳ Исключение (Таймаут верификации)",
                             description=(
                                 f"**Участник:** {member.mention} (`{member.id}`)\n"
-                                f"**Причина:** Не прошел верификацию за `{VERIFY_TIMEOUT_MINUTES}` мин."
+                                f"**Причина:** Не прошел верификацию за `{timeout_mins}` мин."
                             ),
                             color=COMBAT_RED,
                             timestamp=disnake.utils.utcnow()
@@ -272,7 +340,7 @@ class Verification(commands.Cog):
     async def before_check_unverified(self):
         await self.bot.wait_until_ready()
 
-    @commands.slash_command(contexts=GUILD_ONLY, name="send_verify_panel", description="Отправить панель верификации")
+    @commands.slash_command(contexts=GUILD_ONLY, name="send_verify_panel", description="Отправить панель верификации (с капчей или в 1 клик)")
     @commands.default_member_permissions(administrator=True)
     async def send_verify_panel(
         self,
@@ -280,8 +348,16 @@ class Verification(commands.Cog):
         title: str = "🛡️ Верификация на сервере",
         description: Optional[str] = None,
         button_label: str = "Пройти верификацию",
-        button_emoji: str = "✅"
+        button_emoji: str = "✅",
+        use_captcha: Optional[bool] = commands.Param(default=None, description="Включить ввод капчи? (если не указано — берется из настроек сервера)")
     ):
+        await inter.response.defer(ephemeral=True)
+        if use_captcha is None:
+            cfg = await api.get_guild_config(str(inter.guild_id)) or {}
+            final_captcha = (cfg.get("security") or {}).get("useCaptcha", True)
+        else:
+            final_captcha = use_captcha
+
         final_desc = description or (
             f"Добро пожаловать на сервер **{inter.guild.name}**!\n"
             f"Нажмите на кнопку ниже, чтобы подтвердить профиль и получить доступ к каналам."
@@ -291,9 +367,10 @@ class Verification(commands.Cog):
             embed.set_thumbnail(url=inter.guild.icon.url)
         embed.set_footer(text=UNIFIED_FOOTER)
 
-        view = VerifyView(button_label=button_label, button_emoji=button_emoji)
+        view = VerifyView(button_label=button_label, button_emoji=button_emoji, use_captcha=final_captcha)
         await inter.channel.send(embed=embed, view=view)
-        await inter.response.send_message("✅ Панель верификации успешно отправлена в канал!", ephemeral=True)
+        mode_str = "с защитой Captcha" if final_captcha else "в 1 клик"
+        await inter.edit_original_response(content=f"✅ Панель верификации ({mode_str}) успешно отправлена в канал!")
 
     @commands.slash_command(contexts=GUILD_ONLY, name="edit_verify_panel", description="Отредактировать панель верификации")
     @commands.default_member_permissions(administrator=True)
@@ -304,7 +381,8 @@ class Verification(commands.Cog):
         title: Optional[str] = commands.Param(default=None, description="Новый заголовок"),
         description: Optional[str] = commands.Param(default=None, description="Новый текст описания"),
         button_label: Optional[str] = commands.Param(default=None, description="Новая надпись на кнопке"),
-        button_emoji: Optional[str] = commands.Param(default=None, description="Новый эмодзи на кнопке")
+        button_emoji: Optional[str] = commands.Param(default=None, description="Новый эмодзи на кнопке"),
+        use_captcha: Optional[bool] = commands.Param(default=None, description="Включить ввод капчи при нажатии?")
     ):
         await inter.response.defer(ephemeral=True)
         try:
@@ -330,9 +408,17 @@ class Verification(commands.Cog):
         old_btn = msg.components[0].children[0] if msg.components and msg.components[0].children else None
         new_label = button_label or (old_btn.label if old_btn and old_btn.label else "Пройти верификацию")
         new_emoji = button_emoji or (str(old_btn.emoji) if old_btn and old_btn.emoji else "✅")
-        view = VerifyView(button_label=new_label, button_emoji=new_emoji)
+
+        if use_captcha is None:
+            old_cid = getattr(old_btn, "custom_id", "") if old_btn else ""
+            final_captcha = old_cid == "persistent_verify_captcha"
+        else:
+            final_captcha = use_captcha
+
+        view = VerifyView(button_label=new_label, button_emoji=new_emoji, use_captcha=final_captcha)
         await msg.edit(content=None, embed=new_embed, view=view)
         await inter.edit_original_response(content="✅ Панель верификации успешно обновлена!")
+
 
 def setup(bot: commands.Bot):
     bot.add_cog(Verification(bot))

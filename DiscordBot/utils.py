@@ -9,6 +9,7 @@ DEFAULT_WELCOME_DESC = (
     "Рады видеть тебя на нашем сервере!"
 )
 
+
 async def send_log(guild: disnake.Guild, embed: disnake.Embed):
     cfg = await api.get_guild_config(str(guild.id))
     if not cfg or not cfg.get("logChannelId"):
@@ -24,12 +25,14 @@ async def send_log(guild: disnake.Guild, embed: disnake.Embed):
         except disnake.Forbidden:
             pass
 
+
 async def send_welcome_card(
     member: disnake.Member,
     guild_config: Dict[str, Any],
     extra_roles: Optional[List[disnake.Role]] = None
 ):
-    welcome_channel_id = guild_config.get("welcomeChannelId")
+    welcome_cfg = guild_config.get("welcome") or {}
+    welcome_channel_id = welcome_cfg.get("channelId")
     if not welcome_channel_id:
         return
     try:
@@ -40,8 +43,8 @@ async def send_welcome_card(
     if not welcome_channel or not isinstance(welcome_channel, disnake.TextChannel):
         return
 
-    raw_title = guild_config.get("welcomeTitle") or DEFAULT_WELCOME_TITLE
-    raw_desc = guild_config.get("welcomeDescription") or DEFAULT_WELCOME_DESC
+    raw_title = welcome_cfg.get("title") or DEFAULT_WELCOME_TITLE
+    raw_desc = welcome_cfg.get("description") or DEFAULT_WELCOME_DESC
 
     final_title = raw_title.replace("{user}", member.display_name).replace("{server}", member.guild.name)
     final_desc = raw_desc.replace("{user}", member.mention).replace("{server}", member.guild.name)
@@ -59,6 +62,7 @@ async def send_welcome_card(
     except disnake.Forbidden:
         pass
 
+
 def parse_emoji(raw: Optional[str]):
     raw = (raw or "").strip()
     if not raw:
@@ -69,6 +73,7 @@ def parse_emoji(raw: Optional[str]):
         except Exception:
             return None
     return raw if len(raw) <= 8 else None
+
 
 def add_chunked_role_fields(embed: disnake.Embed, field_name: str, roles_list: List[Dict[str, Any]]):
     lines = [f"• {r.get('emoji', '🔹')} <@&{r['roleId']}> — **{r['name']}**" for r in roles_list]
@@ -91,6 +96,7 @@ def add_chunked_role_fields(embed: disnake.Embed, field_name: str, roles_list: L
         title = field_name if idx == 0 else f"{field_name} (продолжение {idx + 1})"
         embed.add_field(name=title, value=chunk, inline=False)
 
+
 def check_moderation_target(inter: disnake.ApplicationCommandInteraction, target: disnake.Member) -> Optional[str]:
     if target.id == inter.author.id:
         return "❌ Вы не можете применить это действие к самому себе."
@@ -103,6 +109,7 @@ def check_moderation_target(inter: disnake.ApplicationCommandInteraction, target
     if inter.guild.me and target.top_role >= inter.guild.me.top_role:
         return "⚠️ Роль этого участника находится выше или на одном уровне с ролью бота."
     return None
+
 
 def check_role_target(inter: disnake.ApplicationCommandInteraction, target: disnake.Member, role: disnake.Role) -> Optional[str]:
     is_owner = inter.author.id == inter.guild.owner_id

@@ -5,9 +5,10 @@ from typing import Optional
 from api import api
 from views import SettingsDashboardView
 from config import (
-    GUILD_ONLY, P3_BLUE, COMBAT_RED, TACTICAL_GREEN,
+    GUILD_ONLY, P3_BLUE, TACTICAL_GREEN,
     UNIFIED_FOOTER, VERIFY_TIMEOUT_MINUTES
 )
+
 
 class Utility(commands.Cog):
     def __init__(self, bot: commands.Bot):
@@ -16,7 +17,7 @@ class Utility(commands.Cog):
     @commands.slash_command(
         contexts=GUILD_ONLY,
         name="setup_config",
-        description="Единая настройка каналов, верификации, ловушки и приватных войсов"
+        description="Единая настройка каналов, верификации, автокика, ловушки и приватных войсов"
     )
     @commands.default_member_permissions(administrator=True)
     async def setup_config(
@@ -28,15 +29,22 @@ class Utility(commands.Cog):
         trap_channel: Optional[disnake.TextChannel] = commands.Param(default=None, description="Канал-ловушка (кик за любое сообщение)"),
         voice_hub_channel: Optional[disnake.VoiceChannel] = commands.Param(default=None, description="Голосовой канал «➕ Создать комнату»"),
         voice_room_template: Optional[str] = commands.Param(default=None, description="Шаблон имени приватной комнаты (например: ╠ 〘🔊〙 {user})"),
-        create_voice_hub: bool = commands.Param(default=False, description="Автоматически создать категорию и канал для приватных войсов?")
+        create_voice_hub: bool = commands.Param(default=False, description="Автоматически создать категорию и канал для приватных войсов?"),
+        use_captcha: Optional[bool] = commands.Param(default=None, description="Требовать ввод капчи при верификации по умолчанию?"),
+        auto_kick_unverified: Optional[bool] = commands.Param(default=None, description="Кикать новичков, если они не прошли верификацию вовремя?"),
+        verify_timeout_minutes: Optional[int] = commands.Param(default=None, description="Через сколько минут кикать неверифицированных (1-1440)", ge=1, le=1440),
     ):
         await inter.response.defer(ephemeral=True)
         guild_id = str(inter.guild_id)
         existing = await api.get_guild_config(guild_id) or {}
 
+        sec_existing = existing.get("security") or {}
+        wel_existing = existing.get("welcome") or {}
+        voi_existing = existing.get("voice") or {}
+
         target_voice_hub = voice_hub_channel
         if create_voice_hub and not target_voice_hub:
-            existing_hub_id = existing.get("voiceGeneratorChannelId")
+            existing_hub_id = voi_existing.get("generatorChannelId")
             if existing_hub_id and str(existing_hub_id).isdigit():
                 ch = inter.guild.get_channel(int(existing_hub_id))
                 if isinstance(ch, disnake.VoiceChannel):
@@ -58,48 +66,74 @@ class Utility(commands.Cog):
                     await inter.edit_original_response(content="⚠️ У бота недостаточно прав для автоматического создания каналов.")
                     return
 
-        payload = {
-            **existing,
-            "guildId": guild_id,
-            "verificationRoleId": str(verification_role.id) if verification_role else existing.get("verificationRoleId"),
-            "welcomeChannelId": str(welcome_channel.id) if welcome_channel else existing.get("welcomeChannelId"),
-            "logChannelId": str(log_channel.id) if log_channel else existing.get("logChannelId"),
-            "trapChannelId": str(trap_channel.id) if trap_channel else existing.get("trapChannelId"),
-            "voiceGeneratorChannelId": str(target_voice_hub.id) if target_voice_hub else existing.get("voiceGeneratorChannelId"),
-            "voiceRoomTemplate": voice_room_template.strip() if voice_room_template else existing.get("voiceRoomTemplate"),
-        }
+        ok = True
 
-        if await api.save_guild_config(payload):
-            embed = disnake.Embed(title="⚙️ Конфигурация сервера успешно сохранена!", color=TACTICAL_GREEN)
-            embed.add_field(
-                name="🛡️ Роль верификации",
-                value=f"<@&{payload['verificationRoleId']}>" if payload.get("verificationRoleId") else "Не задана",
-                inline=False
-            )
-            embed.add_field(
-                name="👋 Канал приветствий",
-                value=f"<#{payload['welcomeChannelId']}>" if payload.get("welcomeChannelId") else "Не задан",
-                inline=False
-            )
-            embed.add_field(
-                name="📜 Канал аудита (логов)",
-                value=f"<#{payload['logChannelId']}>" if payload.get("logChannelId") else "Не задан",
-                inline=False
-            )
-            embed.add_field(
-                name="🔊 Создание приватных войсов",
-                value=f"<#{payload['voiceGeneratorChannelId']}>" if payload.get("voiceGeneratorChannelId") else "Не задан",
-                inline=False
-            )
-            embed.add_field(
-                name="🤫 Канал-ловушка (Тишина)",
-                value=f"<#{payload['trapChannelId']}>" if payload.get("trapChannelId") else "Не задан",
-                inline=False
-            )
-            embed.set_footer(text=UNIFIED_FOOTER)
-            await inter.edit_original_response(embed=embed)
-        else:
+        if log_channel is not None:
+            ok = ok and await api.update_general_config(guild_id, str(log_channel.id))
+
+        if any(x is not None for x in (verification_role, trap_channel, use_captcha, auto_kick_unverified, verify_timeout_minutes)):
+            sec_payload = {
+                "verificationRoleId": str(verification_role.id) if verification_role else sec_existing.get("verificationRoleId"),
+                "trapChannelId": str(trap_channel.id) if trap_channel else sec_existing.get("trapChannelId"),
+                "useCaptcha": use_captcha if use_captcha is not None else sec_existing.get("useCaptcha", True),
+                "autoKickUnverified": auto_kick_unverified if auto_kick_unverified is not None else sec_existing.get("autoKickUnverified", False),
+                "verifyTimeoutMinutes": verify_timeout_minutes if verify_timeout_minutes is not None else sec_existing.get("verifyTimeoutMinutes", VERIFY_TIMEOUT_MINUTES),
+            }
+            ok = ok and await api.update_security_config(guild_id, sec_payload)
+
+        if welcome_channel is not None:
+            wel_payload = {
+                "channelId": str(welcome_channel.id),
+                "title": wel_existing.get("title"),
+                "description": wel_existing.get("description"),
+            }
+            ok = ok and await api.update_welcome_config(guild_id, wel_payload)
+
+        if target_voice_hub is not None or voice_room_template is not None:
+            voi_payload = {
+                "generatorChannelId": str(target_voice_hub.id) if target_voice_hub else voi_existing.get("generatorChannelId"),
+                "roomTemplate": voice_room_template.strip() if voice_room_template else voi_existing.get("roomTemplate"),
+            }
+            ok = ok and await api.update_voice_config(guild_id, voi_payload)
+
+        if not ok:
             await inter.edit_original_response(content="❌ Ошибка при сохранении конфигурации в БД.")
+            return
+
+        cfg = await api.get_guild_config(guild_id) or {}
+        sec = cfg.get("security") or {}
+        wel = cfg.get("welcome") or {}
+        voi = cfg.get("voice") or {}
+
+        v_role_text = f"<@&{sec['verificationRoleId']}>" if sec.get("verificationRoleId") else "Не задана"
+        captcha_text = "Вкл" if sec.get("useCaptcha", True) else "Выкл"
+        autokick_text = f"Вкл ({sec.get('verifyTimeoutMinutes', VERIFY_TIMEOUT_MINUTES)} мин.)" if sec.get("autoKickUnverified") else "Выкл"
+        voice_text = f"<#{voi['generatorChannelId']}> (Шаблон: `{voi.get('roomTemplate') or 'Авто'}`)" if voi.get("generatorChannelId") else "Не заданы"
+
+        embed = disnake.Embed(title="⚙️ Конфигурация сервера успешно сохранена!", color=TACTICAL_GREEN)
+        embed.add_field(
+            name="🛡️ Верификация",
+            value=f"Роль: {v_role_text}\nКапча: `{captcha_text}` | Автокик: `{autokick_text}`",
+            inline=False
+        )
+        embed.add_field(
+            name="👋 Канал приветствий",
+            value=f"<#{wel['channelId']}>" if wel.get("channelId") else "Не задан",
+            inline=False
+        )
+        embed.add_field(
+            name="📜 Канал аудита (логов)",
+            value=f"<#{cfg['logChannelId']}>" if cfg.get("logChannelId") else "Не задан",
+            inline=False
+        )
+        embed.add_field(name="🔊 Приватные войсы", value=voice_text, inline=False)
+        embed.add_field(
+            name="🤫 Канал-ловушка (Тишина)",
+            value=f"<#{sec['trapChannelId']}>" if sec.get("trapChannelId") else "Не задан",
+            inline=False
+        )
+        embed.set_footer(text=UNIFIED_FOOTER)
+        await inter.edit_original_response(embed=embed)
 
     @commands.slash_command(contexts=GUILD_ONLY, name="settings", description="Посмотреть текущие настройки Aigis и управлять ими")
     @commands.default_member_permissions(administrator=True)
@@ -108,16 +142,32 @@ class Utility(commands.Cog):
         guild_id = str(inter.guild_id)
 
         cfg = await api.get_guild_config(guild_id) or {}
-        all_roles = await api.get_roles(str(inter.guild_id))
+        sec = cfg.get("security") or {}
+        wel = cfg.get("welcome") or {}
+        voi = cfg.get("voice") or {}
+        ai = cfg.get("ai") or {}
+
+        all_roles = await api.get_roles(guild_id)
         guild_roles = [r for r in all_roles if str(r.get("roleId", "")).isdigit() and inter.guild.get_role(int(r["roleId"]))]
 
-        v_role = f"<@&{cfg['verificationRoleId']}>" if cfg.get("verificationRoleId") else "🔴 Не настроена"
-        w_chan = f"<#{cfg['welcomeChannelId']}>" if cfg.get("welcomeChannelId") else "⚪ Отключен"
+        v_role = f"<@&{sec['verificationRoleId']}>" if sec.get("verificationRoleId") else "🔴 Не настроена"
+        w_chan = f"<#{wel['channelId']}>" if wel.get("channelId") else "⚪ Отключен"
         l_chan = f"<#{cfg['logChannelId']}>" if cfg.get("logChannelId") else "⚪ Отключен"
-        t_chan = f"<#{cfg['trapChannelId']}> (Кик за сообщение)" if cfg.get("trapChannelId") else "⚪ Отключен"
-        v_hub = f"<#{cfg['voiceGeneratorChannelId']}>" if cfg.get("voiceGeneratorChannelId") else "⚪ Отключен"
-        v_tpl = cfg.get("voiceRoomTemplate") or "Авто (по стилю канала)"
-        v_hub = f"<#{cfg['voiceGeneratorChannelId']}> (Шаблон: `{v_tpl}`)" if cfg.get("voiceGeneratorChannelId") else "⚪ Отключен"
+        t_chan = f"<#{sec['trapChannelId']}> (Кик за сообщение)" if sec.get("trapChannelId") else "⚪ Отключен"
+
+        v_tpl = voi.get("roomTemplate") or "Авто (по стилю канала)"
+        v_hub = f"<#{voi['generatorChannelId']}> (Шаблон: `{v_tpl}`)" if voi.get("generatorChannelId") else "⚪ Отключен"
+
+        autokick_str = (
+            f"🟢 Включен (`{sec.get('verifyTimeoutMinutes', VERIFY_TIMEOUT_MINUTES)} мин.`)"
+            if sec.get("autoKickUnverified") else "⚪ Отключен"
+        )
+        captcha_str = "🛡️ Включена" if sec.get("useCaptcha", True) else "⚡ В 1 клик"
+        ai_str = (
+            f"🟢 Вкл | Модель: `{ai.get('provider', 'auto')}` | Режим: `{ai.get('mode', 'standard')}`"
+            if ai.get("enabled", True) else "🔴 Отключен"
+        )
+
         categories_set = set(r.get("category") or "Общие" for r in guild_roles)
         roles_info = f"Всего: **{len(guild_roles)}** шт. в категориях: {', '.join(f'`{c}`' for c in categories_set)}" if guild_roles else "⚪ Роли не добавлены"
 
@@ -129,36 +179,18 @@ class Utility(commands.Cog):
         if inter.guild.icon:
             embed.set_thumbnail(url=inter.guild.icon.url)
 
-        embed.add_field(name="🛡️ Роль верификации", value=v_role, inline=False)
+        embed.add_field(name="🛡️ Роль верификации", value=f"{v_role} ({captcha_str})", inline=False)
+        embed.add_field(name="⏱️ Автокик новичков", value=autokick_str, inline=False)
         embed.add_field(name="👋 Канал приветствий", value=w_chan, inline=False)
         embed.add_field(name="📜 Канал аудита (логов)", value=l_chan, inline=False)
         embed.add_field(name="🔊 Создание приватных войсов", value=v_hub, inline=False)
         embed.add_field(name="🤫 Канал-ловушка (Тишина)", value=t_chan, inline=False)
-        embed.add_field(name="⏱️ Таймер автокика новичков", value=f"`{VERIFY_TIMEOUT_MINUTES} минут`", inline=False)
+        embed.add_field(name="🤖 Модуль ИИ", value=ai_str, inline=False)
         embed.add_field(name="🎭 Роли для выбора (в базе)", value=roles_info, inline=False)
         embed.set_footer(text=UNIFIED_FOOTER)
 
         view = SettingsDashboardView(author_id=inter.author.id)
         await inter.edit_original_response(embed=embed, view=view)
-
-    @commands.slash_command(contexts=GUILD_ONLY, name="overdrive_mode", description="🔥 Активировать боевой режим перегрузки Aigis")
-    @commands.default_member_permissions(administrator=True)
-    async def overdrive_mode(self, inter: disnake.ApplicationCommandInteraction):
-        await inter.response.defer()
-        embed = disnake.Embed(
-            title="⚠️ РЕЖИМ «ПЕРЕГРУЗКА» АКТИВИРОВАН (OVERDRIVE MODE)",
-            description=(
-                "**[ОГРАНИЧИТЕЛИ СНЯТЫ]**\n"
-                "Все системы охлаждения отключены. Редукторы мощности переведены на 120%!\n"
-                "Папиллонное сердце работает на пиковой частоте. Боевая готовность: **МАКСИМАЛЬНАЯ**."
-            ),
-            color=COMBAT_RED
-        )
-        embed.add_field(name="🔋 Энергия ядра", value="`120% (Overdrive)`", inline=True)
-        embed.add_field(name="🌡️ Температура приводов", value="`850°C (Критическая)`", inline=True)
-        embed.add_field(name="🎯 Скорость реакции", value="`0.01 ms`", inline=True)
-        embed.set_footer(text=UNIFIED_FOOTER)
-        await inter.edit_original_response(embed=embed)
 
     @commands.slash_command(contexts=GUILD_ONLY, name="scan", description="🔍 Информация об участнике")
     async def scan(
@@ -172,10 +204,7 @@ class Utility(commands.Cog):
         persona_sync = (target.id % 60) + 40
         threat_level = "🟢 Участник" if not target.guild_permissions.administrator else "👑 Администратор"
 
-        embed = disnake.Embed(
-            title=f"🔍 Информация об участнике: {target.display_name}",
-            color=P3_BLUE
-        )
+        embed = disnake.Embed(title=f"🔍 Информация об участнике: {target.display_name}", color=P3_BLUE)
         embed.set_thumbnail(url=target.display_avatar.url)
         embed.add_field(name="ID", value=f"`{target.id}`", inline=True)
         embed.add_field(name="Статус", value=threat_level, inline=True)
@@ -195,10 +224,7 @@ class Utility(commands.Cog):
         backend_status = "🟢 В норме" if backend_ok else "🔴 Сбой связи"
         discord_ping = round(self.bot.latency * 1000)
 
-        embed = disnake.Embed(
-            title="🤖 Диагностика систем Aigis",
-            color=P3_BLUE
-        )
+        embed = disnake.Embed(title="🤖 Диагностика систем Aigis", color=P3_BLUE)
         embed.add_field(name="📡 Шлюз Discord", value=f"`{discord_ping} ms`", inline=True)
         embed.add_field(name="💾 База данных C#", value=f"`{backend_time} ms` ({backend_status})", inline=True)
         embed.add_field(name="❤️ Статус", value="`Стабильно`", inline=True)
@@ -212,10 +238,7 @@ class Utility(commands.Cog):
         bots = len([m for m in guild.members if m.bot])
         created_at = guild.created_at.strftime("%d.%m.%Y")
 
-        embed = disnake.Embed(
-            title=f"📊 Информация о сервере: {guild.name}",
-            color=P3_BLUE
-        )
+        embed = disnake.Embed(title=f"📊 Информация о сервере: {guild.name}", color=P3_BLUE)
         if guild.icon:
             embed.set_thumbnail(url=guild.icon.url)
 
@@ -275,6 +298,7 @@ class Utility(commands.Cog):
         if audit_cog:
             await audit_cog.on_member_join(target)
             await inter.edit_original_response(content=f"✅ Симуляция входа для {target.mention} выполнена! Проверь роли и канал логов.")
+
 
 def setup(bot: commands.Bot):
     bot.add_cog(Utility(bot))

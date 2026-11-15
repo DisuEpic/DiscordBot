@@ -4,6 +4,7 @@ from typing import Optional, List, Dict, Any, Tuple
 from urllib.parse import quote
 from config import API_BASE_URL, API_KEY, log
 
+
 class BackendClient:
     CACHE_TTL = 120
 
@@ -74,6 +75,15 @@ class BackendClient:
         status, data = await self._request("GET", f"/users/{guild_id}/{discord_id}")
         return data if status == 200 else None
 
+    # --- МОДУЛЬНЫЕ НАСТРОЙКИ СЕРВЕРА ---
+
+    def _update_cache(self, guild_id: str, data: Any):
+        if isinstance(data, dict):
+            self._config_cache[guild_id] = data
+            self._config_cache_time[guild_id] = time.time()
+        else:
+            self._config_cache.pop(guild_id, None)
+
     async def get_guild_config(self, guild_id: str) -> Optional[Dict[str, Any]]:
         now = time.time()
         if guild_id in self._config_cache and (now - self._config_cache_time.get(guild_id, 0)) < self.CACHE_TTL:
@@ -86,12 +96,51 @@ class BackendClient:
             return data
         return self._config_cache.get(guild_id) if status is None else None
 
-    async def save_guild_config(self, config_data: Dict[str, Any]) -> bool:
-        status, _ = await self._request("POST", "/config", json=config_data)
+    async def update_general_config(self, guild_id: str, log_channel_id: Optional[str]) -> bool:
+        status, data = await self._request(
+            "PUT", f"/config/{guild_id}/general", json={"logChannelId": log_channel_id}
+        )
         if status == 200:
-            self._config_cache.pop(config_data.get("guildId"), None)
+            self._update_cache(guild_id, data)
             return True
         return False
+
+    async def update_security_config(self, guild_id: str, payload: Dict[str, Any]) -> bool:
+        status, data = await self._request("PUT", f"/config/{guild_id}/security", json=payload)
+        if status == 200:
+            self._update_cache(guild_id, data)
+            return True
+        return False
+
+    async def update_welcome_config(self, guild_id: str, payload: Dict[str, Any]) -> bool:
+        status, data = await self._request("PUT", f"/config/{guild_id}/welcome", json=payload)
+        if status == 200:
+            self._update_cache(guild_id, data)
+            return True
+        return False
+
+    async def update_voice_config(self, guild_id: str, payload: Dict[str, Any]) -> bool:
+        status, data = await self._request("PUT", f"/config/{guild_id}/voice", json=payload)
+        if status == 200:
+            self._update_cache(guild_id, data)
+            return True
+        return False
+
+    async def update_ai_config(self, guild_id: str, payload: Dict[str, Any]) -> bool:
+        status, data = await self._request("PUT", f"/config/{guild_id}/ai", json=payload)
+        if status == 200:
+            self._update_cache(guild_id, data)
+            return True
+        return False
+
+    async def reset_guild_config(self, guild_id: str) -> bool:
+        status, data = await self._request("POST", f"/config/{guild_id}/reset")
+        if status == 200:
+            self._update_cache(guild_id, data)
+            return True
+        return False
+
+    # --- РОЛИ ПО КНОПКАМ ---
 
     async def get_roles(self, guild_id: str) -> List[Dict[str, Any]]:
         now = time.time()
@@ -126,5 +175,6 @@ class BackendClient:
             self._roles_cache.pop(guild_id, None)
             return True
         return False
+
 
 api = BackendClient(API_BASE_URL, API_KEY)

@@ -10,6 +10,7 @@ from config import (
     RAID_WINDOW_SECONDS, RAID_JOIN_THRESHOLD, RAID_ALERT_COOLDOWN, YOUNG_ACCOUNT_DAYS
 )
 
+
 def is_safe_to_restore_role(role: disnake.Role, bot_top_role: disnake.Role | None) -> bool:
     if role.is_default() or role.managed:
         return False
@@ -63,7 +64,8 @@ class Audit(commands.Cog):
             return
 
         cfg = await api.get_guild_config(str(message.guild.id))
-        if cfg and cfg.get("trapChannelId") and str(message.channel.id) == str(cfg["trapChannelId"]):
+        trap_channel_id = ((cfg or {}).get("security") or {}).get("trapChannelId")
+        if trap_channel_id and str(message.channel.id) == str(trap_channel_id):
             member = message.author
             if not member.guild_permissions.manage_messages and not member.guild_permissions.administrator and member.id != message.guild.owner_id:
                 try:
@@ -218,14 +220,16 @@ class Audit(commands.Cog):
 
         restored_roles: List[disnake.Role] = []
         cfg = await api.get_guild_config(str(member.guild.id)) or {}
+        sec_cfg = cfg.get("security") or {}
+        verify_role_id = sec_cfg.get("verificationRoleId")
         profile = None
 
         if not member.bot:
             profile = await api.get_user_profile(str(member.guild.id), str(member.id))
             if profile:
                 saved_role_ids = set(str(r) for r in (profile.get("roles") or []))
-                if profile.get("isVerified") and cfg.get("verificationRoleId"):
-                    saved_role_ids.add(str(cfg["verificationRoleId"]))
+                if profile.get("isVerified") and verify_role_id:
+                    saved_role_ids.add(str(verify_role_id))
 
                 bot_top_role = member.guild.me.top_role if member.guild.me else None
                 roles_to_add: List[disnake.Role] = []
@@ -244,7 +248,6 @@ class Audit(commands.Cog):
                     except disnake.HTTPException:
                         self._restoring_members.pop(member.id, None)
 
-            verify_role_id = cfg.get("verificationRoleId")
             verify_role_obj = member.guild.get_role(int(verify_role_id)) if (verify_role_id and str(verify_role_id).isdigit()) else None
             is_already_verified = bool(profile and profile.get("isVerified"))
 
@@ -286,7 +289,6 @@ class Audit(commands.Cog):
 
     @commands.Cog.listener()
     async def on_member_remove(self, member: disnake.Member):
-        # Проверяем, не был ли это кик через стандартный интерфейс Discord
         entry = await fetch_recent_audit_entry(member.guild, disnake.AuditLogAction.kick, target_id=member.id)
         if entry and entry.user and entry.user.id != self.bot.user.id:
             reason = entry.reason or "Причина не указана"
@@ -319,7 +321,7 @@ class Audit(commands.Cog):
     async def on_member_ban(self, guild: disnake.Guild, user: disnake.User):
         entry = await fetch_recent_audit_entry(guild, disnake.AuditLogAction.ban, target_id=user.id)
         if entry and entry.user and entry.user.id == self.bot.user.id:
-            return  # Уже залогировано командой /ban
+            return
 
         mod_text = f"\n**Модератор:** {entry.user.mention}" if (entry and entry.user) else ""
         reason_text = f"\n**Причина:** {entry.reason}" if (entry and entry.reason) else ""
@@ -338,7 +340,7 @@ class Audit(commands.Cog):
     async def on_member_unban(self, guild: disnake.Guild, user: disnake.User):
         entry = await fetch_recent_audit_entry(guild, disnake.AuditLogAction.unban, target_id=user.id)
         if entry and entry.user and entry.user.id == self.bot.user.id:
-            return  # Уже залогировано командой /unban
+            return
 
         mod_text = f"\n**Модератор:** {entry.user.mention}" if (entry and entry.user) else ""
         embed = disnake.Embed(
@@ -356,7 +358,6 @@ class Audit(commands.Cog):
         if after.bot:
             return
 
-        # 1. Изменение никнейма
         if before.nick != after.nick:
             old_nick = before.nick or before.name
             new_nick = after.nick or after.name
@@ -372,7 +373,6 @@ class Audit(commands.Cog):
             embed.set_footer(text=UNIFIED_FOOTER)
             await send_log(after.guild, embed)
 
-        # 2. Выдача или снятие таймаута через стандартный интерфейс Discord
         if before.current_timeout != after.current_timeout:
             entry = await fetch_recent_audit_entry(after.guild, disnake.AuditLogAction.member_update, target_id=after.id)
             if not (entry and entry.user and entry.user.id == self.bot.user.id):
@@ -401,7 +401,6 @@ class Audit(commands.Cog):
                     embed.set_footer(text=UNIFIED_FOOTER)
                     await send_log(after.guild, embed)
 
-        # 3. Изменение ролей
         if before.roles != after.roles:
             added_roles = [r for r in after.roles if r not in before.roles and not r.is_default()]
             removed_roles = [r for r in before.roles if r not in after.roles and not r.is_default()]
@@ -439,7 +438,8 @@ class Audit(commands.Cog):
             return
 
         cfg = await api.get_guild_config(str(member.guild.id))
-        gen_id_str = str(cfg.get("voiceGeneratorChannelId")) if cfg and cfg.get("voiceGeneratorChannelId") else None
+        voice_cfg = (cfg or {}).get("voice") or {}
+        gen_id_str = str(voice_cfg.get("generatorChannelId")) if voice_cfg.get("generatorChannelId") else None
 
         if after.channel and gen_id_str and str(after.channel.id) == gen_id_str:
             return
@@ -573,6 +573,7 @@ class Audit(commands.Cog):
         )
         embed.set_footer(text=UNIFIED_FOOTER)
         await send_log(role.guild, embed)
+
 
 def setup(bot: commands.Bot):
     bot.add_cog(Audit(bot))

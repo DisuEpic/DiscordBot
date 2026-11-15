@@ -297,30 +297,36 @@ class AIChat(commands.Cog):
             )
         return self._session
 
-    # -------------------------------------------------------------------------
-    # ЧТЕНИЕ И СОХРАНЕНИЕ НАСТРОЕК ИИ В БАЗУ ДАННЫХ C#
-    # -------------------------------------------------------------------------
     async def get_ai_config(self, guild_id: int) -> Dict[str, Any]:
         db_cfg = await api.get_guild_config(str(guild_id)) or {}
+        ai_sub = db_cfg.get("ai") or {}
+        sec_sub = db_cfg.get("security") or {}
         local_cfg = self._local_fallback_cfg.get(guild_id, {})
 
-        merged = {**local_cfg, **db_cfg}
-        if merged.get("aiEnabled") is None:
-            merged["aiEnabled"] = local_cfg.get("aiEnabled", True)
-        if not merged.get("aiMode"):
-            merged["aiMode"] = local_cfg.get("aiMode", "standard")
-        if not merged.get("aiProvider"):
-            merged["aiProvider"] = local_cfg.get("aiProvider", "auto")
-        return merged
+        return {
+            "aiEnabled": ai_sub.get("enabled") if "enabled" in ai_sub else local_cfg.get("aiEnabled", True),
+            "aiMode": ai_sub.get("mode") or local_cfg.get("aiMode", "standard"),
+            "aiProvider": ai_sub.get("provider") or local_cfg.get("aiProvider", "auto"),
+            "aiCustomScenario": ai_sub.get("customScenario") if "customScenario" in ai_sub else local_cfg.get("aiCustomScenario"),
+            "aiCustomRules": ai_sub.get("customRules") if "customRules" in ai_sub else local_cfg.get("aiCustomRules"),
+            "logChannelId": db_cfg.get("logChannelId"),
+            "verificationRoleId": sec_sub.get("verificationRoleId"),
+            "trapChannelId": sec_sub.get("trapChannelId"),
+        }
 
     async def update_ai_config(self, guild_id: int, **kwargs) -> bool:
         current = await self.get_ai_config(guild_id)
-        current["guildId"] = str(guild_id)
-        for k, v in kwargs.items():
-            current[k] = v
-
+        current.update(kwargs)
         self._local_fallback_cfg[guild_id] = current
-        return await api.save_guild_config(current)
+
+        ai_payload = {
+            "enabled": current.get("aiEnabled", True),
+            "mode": current.get("aiMode") or "standard",
+            "provider": current.get("aiProvider") or "auto",
+            "customScenario": current.get("aiCustomScenario"),
+            "customRules": current.get("aiCustomRules"),
+        }
+        return await api.update_ai_config(str(guild_id), ai_payload)
 
     # -------------------------------------------------------------------------
     # РАСПОЗНАВАНИЕ СОЗДАТЕЛЯ (DISU) ПО DISCORD ID

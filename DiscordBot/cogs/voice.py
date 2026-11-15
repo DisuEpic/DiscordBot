@@ -13,7 +13,6 @@ def format_voice_room_name(custom_text: str, template: Optional[str], generator_
             return tpl.replace("{user}", custom_text)[:40]
         return f"{tpl} {custom_text}".strip()[:40]
 
-    # Умное авто-определение: если генератор оформлен веточками (╔ 〘➕〙...), делаем ╠ 〘🔊〙
     if generator_name.startswith(("╔", "╠", "╚")) and "〘" in generator_name:
         return f"╠ 〘🔊〙 {custom_text}"[:40]
 
@@ -87,10 +86,11 @@ class VoiceControlView(disnake.ui.View):
             return
         if isinstance(inter.channel, disnake.VoiceChannel):
             cfg = await api.get_guild_config(str(inter.guild_id)) or {}
-            gen_id = cfg.get("voiceGeneratorChannelId")
+            voice_cfg = cfg.get("voice") or {}
+            gen_id = voice_cfg.get("generatorChannelId")
             gen_ch = inter.guild.get_channel(int(gen_id)) if (gen_id and str(gen_id).isdigit()) else None
             gen_name = gen_ch.name if gen_ch else ""
-            await inter.response.send_modal(RenameVoiceModal(inter.channel, cfg.get("voiceRoomTemplate"), gen_name))
+            await inter.response.send_modal(RenameVoiceModal(inter.channel, voice_cfg.get("roomTemplate"), gen_name))
 
     @disnake.ui.button(label="Выгнать участника", style=disnake.ButtonStyle.danger, emoji="👢")
     async def kick_member(self, button: disnake.ui.Button, inter: disnake.MessageInteraction):
@@ -160,7 +160,8 @@ class VoiceHub(commands.Cog):
 
         guild = member.guild
         cfg = await api.get_guild_config(str(guild.id)) or {}
-        gen_id_str = cfg.get("voiceGeneratorChannelId")
+        voice_cfg = cfg.get("voice") or {}
+        gen_id_str = voice_cfg.get("generatorChannelId")
 
         if after.channel and gen_id_str and str(after.channel.id) == str(gen_id_str):
             category = after.channel.category
@@ -173,7 +174,7 @@ class VoiceHub(commands.Cog):
 
             room_name = format_voice_room_name(
                 custom_text=member.display_name,
-                template=cfg.get("voiceRoomTemplate"),
+                template=voice_cfg.get("roomTemplate"),
                 generator_name=after.channel.name
             )
 

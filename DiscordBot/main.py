@@ -1,10 +1,13 @@
 import os
+import logging
 import asyncio
 import disnake
 from disnake.ext import commands, tasks
 from config import BOT_TOKEN, log
 from api import api
 from views import VerifyView
+
+logging.getLogger("disnake.gateway").setLevel(logging.WARNING)
 
 intents = disnake.Intents.default()
 intents.members = True
@@ -42,7 +45,8 @@ async def before_rotate_presence():
 
 @bot.event
 async def on_ready():
-    bot.add_view(VerifyView())
+    bot.add_view(VerifyView(use_captcha=False))
+    bot.add_view(VerifyView(use_captcha=True))
     if not rotate_presence.is_running():
         rotate_presence.start()
 
