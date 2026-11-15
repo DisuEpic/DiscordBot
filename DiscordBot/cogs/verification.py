@@ -13,12 +13,12 @@ from views import VerifyView
 from cogs.audit import is_safe_to_restore_role
 from config import (
     GUILD_ONLY, VERIFY_TIMEOUT_MINUTES, VERIFY_WINDOW_HOURS,
-    TACTICAL_GREEN, COMBAT_RED, UNIFIED_FOOTER, log
+    CAPTCHA_ACCOUNT_DAYS, TACTICAL_GREEN, COMBAT_RED, UNIFIED_FOOTER, log
 )
 
 
 class CaptchaModal(disnake.ui.Modal):
-    """Интерактивная капча во всплывающем окне при нажатии на кнопку верификации."""
+    """Интерактивная капча во всплывающем окне (показывается только новым аккаунтам)."""
     def __init__(self, cog: "Verification"):
         self.cog = cog
         alphabet = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"
@@ -47,7 +47,7 @@ class CaptchaModal(disnake.ui.Modal):
             return
 
         await inter.response.defer(ephemeral=True)
-        await self.cog._complete_verification(inter, respond_ephemeral=True)
+        await self.cog._complete_verification(inter, respond_ephemeral=True, passed_captcha=True)
 
 
 class Verification(commands.Cog):
@@ -62,7 +62,8 @@ class Verification(commands.Cog):
     async def _complete_verification(
         self,
         inter: disnake.Interaction,
-        respond_ephemeral: bool = False
+        respond_ephemeral: bool = False,
+        passed_captcha: bool = False
     ):
         guild_id = str(inter.guild_id)
         user_id = str(inter.author.id)
@@ -124,11 +125,13 @@ class Verification(commands.Cog):
             extra_restored = [r for r in roles_to_give if r != verify_role]
             await send_welcome_card(inter.author, guild_config or {}, extra_roles=extra_restored)
 
+            captcha_note = "\n**Проверка:** 🛡️ Капча пройдена (новый аккаунт)" if passed_captcha else ""
             log_embed = disnake.Embed(
                 title="✅ Участник верифицирован",
                 description=(
                     f"**Участник:** {inter.author.mention} (`{inter.author.id}`)\n"
                     f"**Выданы роли:** {roles_mentions}"
+                    f"{captcha_note}"
                 ),
                 color=TACTICAL_GREEN,
                 timestamp=disnake.utils.utcnow()
@@ -154,11 +157,15 @@ class Verification(commands.Cog):
                 await inter.response.send_message("✅ Вы уже прошли верификацию!", ephemeral=True)
                 return
 
-        if cid == "persistent_verify_captcha":
+        account_age_days = (disnake.utils.utcnow() - inter.author.created_at).days
+        is_new_account = account_age_days < CAPTCHA_ACCOUNT_DAYS
+
+        # Капчу показываем ТОЛЬКО новым аккаунтам (младше CAPTCHA_ACCOUNT_DAYS дней)
+        if cid == "persistent_verify_captcha" and is_new_account:
             await inter.response.send_modal(CaptchaModal(self))
         else:
             await inter.response.defer()
-            await self._complete_verification(inter, respond_ephemeral=False)
+            await self._complete_verification(inter, respond_ephemeral=False, passed_captcha=False)
 
     @commands.slash_command(
         contexts=GUILD_ONLY,
@@ -340,7 +347,7 @@ class Verification(commands.Cog):
     async def before_check_unverified(self):
         await self.bot.wait_until_ready()
 
-    @commands.slash_command(contexts=GUILD_ONLY, name="send_verify_panel", description="Отправить панель верификации (с капчей или в 1 клик)")
+    @commands.slash_command(contexts=GUILD_ONLY, name="send_verify_panel", description="Отправить панель верификации (с капчей для новых аккаунтов или в 1 клик)")
     @commands.default_member_permissions(administrator=True)
     async def send_verify_panel(
         self,
@@ -349,7 +356,7 @@ class Verification(commands.Cog):
         description: Optional[str] = None,
         button_label: str = "Пройти верификацию",
         button_emoji: str = "✅",
-        use_captcha: Optional[bool] = commands.Param(default=None, description="Включить ввод капчи? (если не указано — берется из настроек сервера)")
+        use_captcha: Optional[bool] = commands.Param(default=None, description="Включить капчу для новых аккаунтов? (по умолчанию из настроек)")
     ):
         await inter.response.defer(ephemeral=True)
         if use_captcha is None:
@@ -369,7 +376,7 @@ class Verification(commands.Cog):
 
         view = VerifyView(button_label=button_label, button_emoji=button_emoji, use_captcha=final_captcha)
         await inter.channel.send(embed=embed, view=view)
-        mode_str = "с защитой Captcha" if final_captcha else "в 1 клик"
+        mode_str = f"с капчей для аккаунтов < {CAPTCHA_ACCOUNT_DAYS} дн." if final_captcha else "в 1 клик для всех"
         await inter.edit_original_response(content=f"✅ Панель верификации ({mode_str}) успешно отправлена в канал!")
 
     @commands.slash_command(contexts=GUILD_ONLY, name="edit_verify_panel", description="Отредактировать панель верификации")
@@ -382,7 +389,7 @@ class Verification(commands.Cog):
         description: Optional[str] = commands.Param(default=None, description="Новый текст описания"),
         button_label: Optional[str] = commands.Param(default=None, description="Новая надпись на кнопке"),
         button_emoji: Optional[str] = commands.Param(default=None, description="Новый эмодзи на кнопке"),
-        use_captcha: Optional[bool] = commands.Param(default=None, description="Включить ввод капчи при нажатии?")
+        use_captcha: Optional[bool] = commands.Param(default=None, description="Включить капчу для новых аккаунтов?")
     ):
         await inter.response.defer(ephemeral=True)
         try:

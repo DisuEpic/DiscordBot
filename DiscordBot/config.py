@@ -25,6 +25,7 @@ RAID_JOIN_THRESHOLD = 8
 RAID_WINDOW_SECONDS = 20
 RAID_ALERT_COOLDOWN = 300
 YOUNG_ACCOUNT_DAYS = 3
+CAPTCHA_ACCOUNT_DAYS = 7  # Возраст аккаунта (в днях), младше которого требуется капча
 
 UNIFIED_FOOTER = "Aigis Security"
 
