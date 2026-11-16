@@ -43,35 +43,9 @@ if (app.Environment.IsDevelopment())
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    try
+    if (app.Configuration.GetValue("AutoMigrate", true))
     {
-        if (app.Configuration.GetValue("AutoMigrate", true))
-        {
-            db.Database.Migrate();
-        }
-    }
-    catch (Exception ex)
-    {
-        app.Logger.LogWarning(ex, "Колонки уже существуют. Применяем безопасную синхронизацию схемы.");
-    }
-
-    try
-    {
-        db.Database.ExecuteSqlRaw("""
-            ALTER TABLE "ServerConfigs" ADD COLUMN IF NOT EXISTS "WelcomeTitle" text;
-            ALTER TABLE "ServerConfigs" ADD COLUMN IF NOT EXISTS "WelcomeDescription" text;
-            ALTER TABLE "ServerConfigs" ADD COLUMN IF NOT EXISTS "VoiceGeneratorChannelId" character varying(32);
-            ALTER TABLE "ServerConfigs" ADD COLUMN IF NOT EXISTS "VoiceRoomTemplate" character varying(64);
-            ALTER TABLE "ServerConfigs" ADD COLUMN IF NOT EXISTS "AiEnabled" boolean NOT NULL DEFAULT true;
-            ALTER TABLE "ServerConfigs" ADD COLUMN IF NOT EXISTS "AiMode" character varying(32) DEFAULT 'standard';
-            ALTER TABLE "ServerConfigs" ADD COLUMN IF NOT EXISTS "AiCustomScenario" text;
-            ALTER TABLE "ServerConfigs" ADD COLUMN IF NOT EXISTS "AiCustomRules" text;
-            ALTER TABLE "ServerConfigs" ADD COLUMN IF NOT EXISTS "AiProvider" character varying(32) DEFAULT 'auto';
-        """);
-    }
-    catch (Exception ex)
-    {
-        app.Logger.LogError(ex, "Ошибка при проверке дополнительных колонок БД.");
+        db.Database.Migrate();
     }
 }
 

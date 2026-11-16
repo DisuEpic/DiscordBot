@@ -8,7 +8,6 @@ public class AppDbContext : DbContext
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
     public DbSet<User> Users => Set<User>();
-    public DbSet<ServerConfig> ServerConfigs => Set<ServerConfig>(); // временно оставляем
     public DbSet<ReactionRole> Reactions => Set<ReactionRole>();
 
     public DbSet<GuildCoreConfig> GuildCoreConfigs => Set<GuildCoreConfig>();
@@ -26,16 +25,6 @@ public class AppDbContext : DbContext
             e.Property(u => u.GuildId).HasMaxLength(32);
             e.Property(u => u.DiscordId).HasMaxLength(32);
             e.HasIndex(u => new { u.GuildId, u.DiscordId }).IsUnique();
-        });
-
-        modelBuilder.Entity<ServerConfig>(e =>
-        {
-            e.Property(c => c.GuildId).HasMaxLength(32);
-            e.Property(c => c.WelcomeChannelId).HasMaxLength(32);
-            e.Property(c => c.VerificationRoleId).HasMaxLength(32);
-            e.Property(c => c.LogChannelId).HasMaxLength(32);
-            e.Property(c => c.TrapChannelId).HasMaxLength(32);
-            e.HasIndex(c => c.GuildId).IsUnique();
         });
 
         modelBuilder.Entity<ReactionRole>(e =>

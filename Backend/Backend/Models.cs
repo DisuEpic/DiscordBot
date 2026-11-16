@@ -12,26 +12,6 @@ public class User
     public List<string> Roles { get; set; } = new();   // ID ролей
 }
 
-public class ServerConfig
-{
-    public Guid Id { get; set; } = Guid.NewGuid();
-    public required string GuildId { get; set; }
-    public string? WelcomeChannelId { get; set; }
-    public string? VerificationRoleId { get; set; }
-    public string? LogChannelId { get; set; }
-    public string? TrapChannelId { get; set; }
-    public string? WelcomeTitle { get; set; }
-    public string? WelcomeDescription { get; set; }
-    public string? VoiceGeneratorChannelId { get; set; }
-    public string? VoiceRoomTemplate { get; set; }
-    public bool AiEnabled { get; set; } = true;
-    public string? AiMode { get; set; }
-    public string? AiCustomScenario { get; set; }
-    public string? AiCustomRules { get; set; }
-    public string? AiProvider { get; set; } = "auto";
-}
-
-// --- НОВЫЕ МОДУЛЬНЫЕ МОДЕЛИ ---
 
 public class GuildCoreConfig
 {

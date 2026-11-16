@@ -24,18 +24,26 @@ class MireiBot(commands.AutoShardedInteractionBot):
 bot = MireiBot(intents=intents)
 
 
-@tasks.loop(seconds=45)
-async def rotate_presence():
-    activities = [
-        disnake.Activity(type=disnake.ActivityType.watching, name=f"за {len(bot.guilds)} серверами 💠"),
-        disnake.Activity(type=disnake.ActivityType.playing, name="/help • Тегни @Mirei 🌸"),
-        disnake.Activity(type=disnake.ActivityType.listening, name="голосовые комнаты 🔊"),
-        disnake.Activity(type=disnake.ActivityType.watching, name="за порядком и безопасностью 🛡️"),
-    ]
-    for activity in activities:
-        await bot.change_presence(activity=activity)
-        await asyncio.sleep(45)
+def _plural_servers(n: int) -> str:
+    if 11 <= (n % 100) <= 19:
+        return "серверов"
+    last = n % 10
+    if last == 1:
+        return "сервер"
+    if 2 <= last <= 4:
+        return "сервера"
+    return "серверов"
 
+
+@tasks.loop(minutes=5)
+async def rotate_presence():
+    count = len(bot.guilds)
+    count_str = f"{count:,}".replace(",", " ")
+    activity = disnake.Activity(
+        type=disnake.ActivityType.watching,
+        name=f"{count_str} {_plural_servers(count)} | /help"
+    )
+    await bot.change_presence(activity=activity)
 
 @rotate_presence.before_loop
 async def before_rotate_presence():
