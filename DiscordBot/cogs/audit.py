@@ -482,8 +482,23 @@ class Audit(commands.Cog):
             embed.set_footer(text=UNIFIED_FOOTER)
             await send_log(member.guild, embed)
 
+    async def _is_stats_channel(self, guild_id: int, channel_id: int) -> bool:
+        stats_cog = self.bot.get_cog("Stats")
+        if stats_cog and hasattr(stats_cog, "ignored_audit_ids") and channel_id in stats_cog.ignored_audit_ids:
+            return True
+        cfg = await api.get_guild_config(str(guild_id)) or {}
+        stats_cfg = cfg.get("stats") or {}
+        stat_ids = {
+            str(stats_cfg.get(k)) for k in (
+                "categoryId", "allMembersChannelId", "membersChannelId",
+                "botsChannelId", "channelsChannelId", "rolesChannelId", "voiceChannelId"
+            ) if stats_cfg.get(k)
+        }
+        return str(channel_id) in stat_ids
     @commands.Cog.listener()
     async def on_guild_channel_create(self, channel: disnake.abc.GuildChannel):
+        if await self._is_stats_channel(channel.guild.id, channel.id):
+            return
         voice_cog = self.bot.get_cog("VoiceHub")
         if voice_cog and hasattr(voice_cog, "temp_channels") and channel.id in voice_cog.temp_channels:
             return
@@ -505,6 +520,8 @@ class Audit(commands.Cog):
 
     @commands.Cog.listener()
     async def on_guild_channel_delete(self, channel: disnake.abc.GuildChannel):
+        if await self._is_stats_channel(channel.guild.id, channel.id):
+            return
         voice_cog = self.bot.get_cog("VoiceHub")
         if voice_cog and hasattr(voice_cog, "deleted_temp_ids") and channel.id in voice_cog.deleted_temp_ids:
             voice_cog.deleted_temp_ids.discard(channel.id)
@@ -525,6 +542,8 @@ class Audit(commands.Cog):
 
     @commands.Cog.listener()
     async def on_guild_channel_update(self, before: disnake.abc.GuildChannel, after: disnake.abc.GuildChannel):
+        if await self._is_stats_channel(after.guild.id, after.id):
+            return
         changes = []
         if before.name != after.name:
             changes.append(f"• **Переименование:** `#{before.name}` ➔ `#{after.name}`")

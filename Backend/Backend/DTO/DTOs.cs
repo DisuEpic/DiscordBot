@@ -56,6 +56,27 @@ public record AiConfigDto(
     string Provider,
     string? CustomScenario,
     string? CustomRules);
+public record UpdateStatsConfigRequest(
+    bool? Enabled = false,
+    string? Style = "en",
+    string? CategoryId = null,
+    string? AllMembersChannelId = null,
+    string? MembersChannelId = null,
+    string? BotsChannelId = null,
+    string? ChannelsChannelId = null,
+    string? RolesChannelId = null,
+    string? VoiceChannelId = null);
+
+public record StatsConfigDto(
+    bool Enabled,
+    string Style,
+    string? CategoryId,
+    string? AllMembersChannelId,
+    string? MembersChannelId,
+    string? BotsChannelId,
+    string? ChannelsChannelId,
+    string? RolesChannelId,
+    string? VoiceChannelId);
 
 public record GuildConfigDto(
     string GuildId,
@@ -65,7 +86,9 @@ public record GuildConfigDto(
     SecurityConfigDto Security,
     WelcomeConfigDto Welcome,
     VoiceConfigDto Voice,
-    AiConfigDto Ai);
+    AiConfigDto Ai,
+    StatsConfigDto Stats);
+
 
 public record ReactionRoleRequest(string GuildId, string Category, string Emoji, string RoleId, string Name);
 

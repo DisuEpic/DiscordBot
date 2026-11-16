@@ -70,8 +70,12 @@ class Utility(commands.Cog):
             inline=False
         )
         embed.add_field(
-            name="📊 Утилиты",
-            value="• `/scan`, `/server_info`, `/avatar`, `/ping`",
+            name="📊 Статистика и Утилиты",
+            value=(
+                "• `/stats setup` | `refresh` | `toggle` | `remove` — счётчики статистики в каналах *(Админ)*\n"
+                "• `/server_stats` — подробная живая статистика сервера\n"
+                "• `/scan`, `/server_info`, `/avatar`, `/ping`"
+            ),
             inline=False
         )
         embed.set_footer(text=UNIFIED_FOOTER)
@@ -209,6 +213,7 @@ class Utility(commands.Cog):
         wel = cfg.get("welcome") or {}
         voi = cfg.get("voice") or {}
         ai = cfg.get("ai") or {}
+        stats = cfg.get("stats") or {}
 
         all_roles = await api.get_roles(guild_id)
         guild_roles = [r for r in all_roles if str(r.get("roleId", "")).isdigit() and inter.guild.get_role(int(r["roleId"]))]
@@ -230,6 +235,10 @@ class Utility(commands.Cog):
             f"🟢 Вкл | Модель: `{ai.get('provider', 'auto')}` | Режим: `{ai.get('mode', 'standard')}`"
             if ai.get("enabled", True) else "🔴 Отключен"
         )
+        stats_str = (
+            f"🟢 Включена (Стиль: `{(stats.get('style') or 'en').upper()}`)"
+            if stats.get("enabled") else "⚪ Отключена (`/stats setup`)"
+        )
 
         categories_set = set(r.get("category") or "Общие" for r in guild_roles)
         roles_info = f"Всего: **{len(guild_roles)}** шт. в категориях: {', '.join(f'`{c}`' for c in categories_set)}" if guild_roles else "⚪ Роли не добавлены"
@@ -248,6 +257,7 @@ class Utility(commands.Cog):
         embed.add_field(name="📜 Канал аудита (логов)", value=l_chan, inline=False)
         embed.add_field(name="🔊 Создание приватных войсов", value=v_hub, inline=False)
         embed.add_field(name="🤫 Канал-ловушка (Тишина)", value=t_chan, inline=False)
+        embed.add_field(name="📊 Статистика в каналах", value=stats_str, inline=False)
         embed.add_field(name="🧠 Модуль ИИ", value=ai_str, inline=False)
         embed.add_field(name="🎭 Роли для выбора (в базе)", value=roles_info, inline=False)
         embed.set_footer(text=UNIFIED_FOOTER)

@@ -110,6 +110,53 @@ namespace DiscordBot_API.Migrations
                     b.ToTable("GuildSecurityConfigs");
                 });
 
+            modelBuilder.Entity("DiscordBot_API.Models.GuildStatsConfig", b =>
+                {
+                    b.Property<string>("GuildId")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("AllMembersChannelId")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("BotsChannelId")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("CategoryId")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("ChannelsChannelId")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("MembersChannelId")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("RolesChannelId")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("Style")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<string>("VoiceChannelId")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.HasKey("GuildId");
+
+                    b.ToTable("GuildStatsConfigs");
+                });
+
             modelBuilder.Entity("DiscordBot_API.Models.GuildVoiceConfig", b =>
                 {
                     b.Property<string>("GuildId")
@@ -243,6 +290,16 @@ namespace DiscordBot_API.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("DiscordBot_API.Models.GuildStatsConfig", b =>
+                {
+                    b.HasOne("DiscordBot_API.Models.GuildCoreConfig", null)
+                        .WithOne("Stats")
+                        .HasForeignKey("DiscordBot_API.Models.GuildStatsConfig", "GuildId")
+                        .HasPrincipalKey("DiscordBot_API.Models.GuildCoreConfig", "GuildId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("DiscordBot_API.Models.GuildVoiceConfig", b =>
                 {
                     b.HasOne("DiscordBot_API.Models.GuildCoreConfig", null)
@@ -268,6 +325,8 @@ namespace DiscordBot_API.Migrations
                     b.Navigation("Ai");
 
                     b.Navigation("Security");
+
+                    b.Navigation("Stats");
 
                     b.Navigation("Voice");
 

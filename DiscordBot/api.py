@@ -132,6 +132,12 @@ class BackendClient:
             self._update_cache(guild_id, data)
             return True
         return False
+    async def update_stats_config(self, guild_id: str, payload: Dict[str, Any]) -> bool:
+        status, data = await self._request("PUT", f"/config/{guild_id}/stats", json=payload)
+        if status == 200:
+            self._update_cache(guild_id, data)
+            return True
+        return False
 
     async def reset_guild_config(self, guild_id: str) -> bool:
         status, data = await self._request("POST", f"/config/{guild_id}/reset")
@@ -175,6 +181,6 @@ class BackendClient:
             self._roles_cache.pop(guild_id, None)
             return True
         return False
-
+    
 
 api = BackendClient(API_BASE_URL, API_KEY)

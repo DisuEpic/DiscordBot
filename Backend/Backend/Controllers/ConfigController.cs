@@ -22,33 +22,44 @@ public class ConfigController : ControllerBase
     }
 
     private static GuildConfigDto ToDto(GuildCoreConfig c) => new(
-        c.GuildId,
-        c.LogChannelId,
-        c.IsPremium,
-        c.PremiumUntil,
-        new SecurityConfigDto(
-            c.Security?.VerificationRoleId,
-            c.Security?.TrapChannelId,
-            c.Security?.UseCaptcha ?? true,
-            c.Security?.AutoKickUnverified ?? false,
-            c.Security?.VerifyTimeoutMinutes ?? 10
-        ),
-        new WelcomeConfigDto(
-            c.Welcome?.ChannelId,
-            c.Welcome?.Title,
-            c.Welcome?.Description
-        ),
-        new VoiceConfigDto(
-            c.Voice?.GeneratorChannelId,
-            c.Voice?.RoomTemplate
-        ),
-        new AiConfigDto(
-            c.Ai?.Enabled ?? true,
-            c.Ai?.Mode ?? "standard",
-            c.Ai?.Provider ?? "auto",
-            c.Ai?.CustomScenario,
-            c.Ai?.CustomRules
-        )
+         c.GuildId,
+         c.LogChannelId,
+         c.IsPremium,
+         c.PremiumUntil,
+         new SecurityConfigDto(
+             c.Security?.VerificationRoleId,
+             c.Security?.TrapChannelId,
+             c.Security?.UseCaptcha ?? true,
+             c.Security?.AutoKickUnverified ?? false,
+             c.Security?.VerifyTimeoutMinutes ?? 10
+         ),
+         new WelcomeConfigDto(
+             c.Welcome?.ChannelId,
+             c.Welcome?.Title,
+             c.Welcome?.Description
+         ),
+         new VoiceConfigDto(
+             c.Voice?.GeneratorChannelId,
+             c.Voice?.RoomTemplate
+         ),
+         new AiConfigDto(
+             c.Ai?.Enabled ?? true,
+             c.Ai?.Mode ?? "standard",
+             c.Ai?.Provider ?? "auto",
+             c.Ai?.CustomScenario,
+             c.Ai?.CustomRules
+         ),
+         new StatsConfigDto(
+             c.Stats?.Enabled ?? false,
+             c.Stats?.Style ?? "en",
+             c.Stats?.CategoryId,
+             c.Stats?.AllMembersChannelId,
+             c.Stats?.MembersChannelId,
+             c.Stats?.BotsChannelId,
+             c.Stats?.ChannelsChannelId,
+             c.Stats?.RolesChannelId,
+             c.Stats?.VoiceChannelId
+         )
     );
 
     private async Task<GuildCoreConfig> EnsureCoreConfigExistsAsync(string guildId)
@@ -59,6 +70,7 @@ public class ConfigController : ControllerBase
             .Include(c => c.Welcome)
             .Include(c => c.Voice)
             .Include(c => c.Ai)
+            .Include(c => c.Stats)
             .FirstOrDefaultAsync(c => c.GuildId == guildId);
 
         if (core != null)
@@ -68,6 +80,7 @@ public class ConfigController : ControllerBase
             if (core.Welcome == null) { core.Welcome = new GuildWelcomeConfig { GuildId = guildId }; changed = true; }
             if (core.Voice == null) { core.Voice = new GuildVoiceConfig { GuildId = guildId }; changed = true; }
             if (core.Ai == null) { core.Ai = new GuildAiConfig { GuildId = guildId }; changed = true; }
+            if (core.Stats == null) { core.Stats = new GuildStatsConfig { GuildId = guildId }; changed = true; }
 
             if (changed)
                 await _context.SaveChangesAsync();
@@ -81,7 +94,8 @@ public class ConfigController : ControllerBase
             Security = new GuildSecurityConfig { GuildId = guildId },
             Welcome = new GuildWelcomeConfig { GuildId = guildId },
             Voice = new GuildVoiceConfig { GuildId = guildId },
-            Ai = new GuildAiConfig { GuildId = guildId }
+            Ai = new GuildAiConfig { GuildId = guildId },
+            Stats = new GuildStatsConfig { GuildId = guildId }
         };
 
         _context.GuildCoreConfigs.Add(newCore);
@@ -116,6 +130,7 @@ public class ConfigController : ControllerBase
             .Include(c => c.Welcome)
             .Include(c => c.Voice)
             .Include(c => c.Ai)
+            .Include(c => c.Stats)
             .FirstOrDefaultAsync(c => c.GuildId == guildId);
 
         if (config == null)
@@ -229,6 +244,43 @@ public class ConfigController : ControllerBase
         await _context.SaveChangesAsync();
         return Ok(ToDto(core));
     }
+    [HttpPut("{guildId}/stats")]
+    public async Task<IActionResult> UpdateStats(string guildId, [FromBody] UpdateStatsConfigRequest request)
+    {
+        if (!Snowflake.IsValid(guildId))
+            return BadRequest(new { message = "Некорректный GuildId." });
+
+        if (!Snowflake.TryNormalizeOptional(request.CategoryId, out var categoryId) ||
+            !Snowflake.TryNormalizeOptional(request.AllMembersChannelId, out var allMembersId) ||
+            !Snowflake.TryNormalizeOptional(request.MembersChannelId, out var membersId) ||
+            !Snowflake.TryNormalizeOptional(request.BotsChannelId, out var botsId) ||
+            !Snowflake.TryNormalizeOptional(request.ChannelsChannelId, out var channelsId) ||
+            !Snowflake.TryNormalizeOptional(request.RolesChannelId, out var rolesId) ||
+            !Snowflake.TryNormalizeOptional(request.VoiceChannelId, out var voiceId))
+        {
+            return BadRequest(new { message = "Один или несколько ID каналов/категории статистики имеют некорректный формат Snowflake." });
+        }
+
+        var core = await EnsureCoreConfigExistsAsync(guildId);
+        var stats = core.Stats!;
+
+        var style = NormalizeOptionalText(request.Style)?.ToLowerInvariant() ?? "en";
+        if (style is not ("en" or "ru"))
+            style = "en";
+
+        stats.Enabled = request.Enabled ?? false;
+        stats.Style = style;
+        stats.CategoryId = categoryId;
+        stats.AllMembersChannelId = allMembersId;
+        stats.MembersChannelId = membersId;
+        stats.BotsChannelId = botsId;
+        stats.ChannelsChannelId = channelsId;
+        stats.RolesChannelId = rolesId;
+        stats.VoiceChannelId = voiceId;
+
+        await _context.SaveChangesAsync();
+        return Ok(ToDto(core));
+    }
 
     [HttpPost("{guildId}/reset")]
     public async Task<IActionResult> ResetConfig(string guildId)
@@ -258,6 +310,15 @@ public class ConfigController : ControllerBase
         core.Ai.Provider = "auto";
         core.Ai.CustomScenario = null;
         core.Ai.CustomRules = null;
+        core.Stats!.Enabled = false;
+        core.Stats.Style = "en";
+        core.Stats.CategoryId = null;
+        core.Stats.AllMembersChannelId = null;
+        core.Stats.MembersChannelId = null;
+        core.Stats.BotsChannelId = null;
+        core.Stats.ChannelsChannelId = null;
+        core.Stats.RolesChannelId = null;
+        core.Stats.VoiceChannelId = null;
 
         await _context.SaveChangesAsync();
         return Ok(ToDto(core));

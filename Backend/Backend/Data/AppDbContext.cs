@@ -15,6 +15,7 @@ public class AppDbContext : DbContext
     public DbSet<GuildWelcomeConfig> GuildWelcomeConfigs => Set<GuildWelcomeConfig>();
     public DbSet<GuildVoiceConfig> GuildVoiceConfigs => Set<GuildVoiceConfig>();
     public DbSet<GuildAiConfig> GuildAiConfigs => Set<GuildAiConfig>();
+    public DbSet<GuildStatsConfig> GuildStatsConfigs => Set<GuildStatsConfig>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -66,6 +67,11 @@ public class AppDbContext : DbContext
                 .HasForeignKey<GuildAiConfig>(a => a.GuildId)
                 .HasPrincipalKey<GuildCoreConfig>(c => c.GuildId)
                 .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(c => c.Stats)
+                .WithOne()
+                .HasForeignKey<GuildStatsConfig>(s => s.GuildId)
+                .HasPrincipalKey<GuildCoreConfig>(c => c.GuildId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<GuildSecurityConfig>(e =>
@@ -97,6 +103,19 @@ public class AppDbContext : DbContext
             e.Property(a => a.GuildId).HasMaxLength(32);
             e.Property(a => a.Mode).HasMaxLength(32);
             e.Property(a => a.Provider).HasMaxLength(32);
+        });
+        modelBuilder.Entity<GuildStatsConfig>(e =>
+        {
+            e.HasKey(s => s.GuildId);
+            e.Property(s => s.GuildId).HasMaxLength(32);
+            e.Property(s => s.Style).HasMaxLength(16);
+            e.Property(s => s.CategoryId).HasMaxLength(32);
+            e.Property(s => s.AllMembersChannelId).HasMaxLength(32);
+            e.Property(s => s.MembersChannelId).HasMaxLength(32);
+            e.Property(s => s.BotsChannelId).HasMaxLength(32);
+            e.Property(s => s.ChannelsChannelId).HasMaxLength(32);
+            e.Property(s => s.RolesChannelId).HasMaxLength(32);
+            e.Property(s => s.VoiceChannelId).HasMaxLength(32);
         });
     }
 }

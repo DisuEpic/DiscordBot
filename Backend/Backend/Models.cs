@@ -25,6 +25,7 @@ public class GuildCoreConfig
     public GuildWelcomeConfig? Welcome { get; set; }
     public GuildVoiceConfig? Voice { get; set; }
     public GuildAiConfig? Ai { get; set; }
+    public GuildStatsConfig? Stats { get; set; }
 }
 
 public class GuildSecurityConfig
@@ -60,6 +61,20 @@ public class GuildAiConfig
     public string Provider { get; set; } = "auto";
     public string? CustomScenario { get; set; }
     public string? CustomRules { get; set; }
+}
+public class GuildStatsConfig
+{
+    public required string GuildId { get; set; }
+    public bool Enabled { get; set; } = false;
+    public string Style { get; set; } = "en";
+
+    public string? CategoryId { get; set; }
+    public string? AllMembersChannelId { get; set; }
+    public string? MembersChannelId { get; set; }
+    public string? BotsChannelId { get; set; }
+    public string? ChannelsChannelId { get; set; }
+    public string? RolesChannelId { get; set; }
+    public string? VoiceChannelId { get; set; }
 }
 
 [Table("Reactions")]
