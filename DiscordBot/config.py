@@ -27,7 +27,7 @@ RAID_ALERT_COOLDOWN = 300
 YOUNG_ACCOUNT_DAYS = 3
 CAPTCHA_ACCOUNT_DAYS = 7
 
-UNIFIED_FOOTER = "💠 Mirei • Умная защита и ИИ"
+UNIFIED_FOOTER = "Mirei • Умная защита и ИИ"
 
 BRAND_COLOR = disnake.Color(0x00E5FF)     # Фирменный бирюзовый неон Mirei
 ACCENT_PINK = disnake.Color(0xFF4D94)     # Неоновая сакура (акценты и Overdrive)
