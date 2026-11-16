@@ -2,7 +2,7 @@ import disnake
 from typing import List, Dict, Any
 from api import api
 from utils import parse_emoji, add_chunked_role_fields
-from config import P3_BLUE, UNIFIED_FOOTER
+from config import BRAND_COLOR, UNIFIED_FOOTER
 
 
 class VerifyView(disnake.ui.View):
@@ -88,7 +88,7 @@ class SettingsDashboardView(disnake.ui.View):
             disnake.SelectOption(label="Сбросить шаблон имени войсов", value="voiceRoomTemplate", emoji="🏷️"),
             disnake.SelectOption(label="Отключить канал-ловушку (Тишина)", value="trapChannelId", emoji="🤫"),
             disnake.SelectOption(label="Сбросить текст шаблона приветствия", value="welcomeText", emoji="📝"),
-            disnake.SelectOption(label="Сбросить настройки ИИ к стандартным", value="aiReset", emoji="🤖"),
+            disnake.SelectOption(label="Сбросить настройки ИИ к стандартным", value="aiReset", emoji="💠"),
         ]
     )
     async def remove_single_config(self, select: disnake.ui.Select, inter: disnake.MessageInteraction):
@@ -109,7 +109,7 @@ class SettingsDashboardView(disnake.ui.View):
             "voiceRoomTemplate": "🏷️ Шаблон имени приватных войсов сброшен.",
             "trapChannelId": "🤫 Канал-ловушка (Тишина) отключен.",
             "welcomeText": "📝 Текст приветствия сброшен к стандартному.",
-            "aiReset": "🤖 Настройки ИИ сброшены к стандартным."
+            "aiReset": "💠 Настройки ИИ сброшены к стандартным."
         }
 
         ok = False
@@ -172,7 +172,7 @@ class SettingsDashboardView(disnake.ui.View):
         embed = disnake.Embed(
             title="📋 Роли сервера, сохраненные в базе данных",
             description="Список доступных ролей по категориям:",
-            color=P3_BLUE
+            color=BRAND_COLOR
         )
         for cat_name, r_list in categories.items():
             add_chunked_role_fields(embed, f"📁 {cat_name}", r_list)

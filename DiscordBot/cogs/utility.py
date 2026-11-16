@@ -5,7 +5,7 @@ from typing import Optional
 from api import api
 from views import SettingsDashboardView
 from config import (
-    GUILD_ONLY, P3_BLUE, TACTICAL_GREEN,
+    GUILD_ONLY, BRAND_COLOR, TACTICAL_GREEN,
     UNIFIED_FOOTER, VERIFY_TIMEOUT_MINUTES
 )
 
@@ -13,6 +13,69 @@ from config import (
 class Utility(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
+
+    @commands.slash_command(
+        contexts=GUILD_ONLY,
+        name="help",
+        description="💠 Список возможностей и команд Mirei"
+    )
+    async def help_cmd(self, inter: disnake.ApplicationCommandInteraction):
+        embed = disnake.Embed(
+            title="💠 Справочный центр Mirei",
+            description=(
+                "Привет! Я **Mirei** 🌸 — твой умный ИИ-ассистент и модульная система защиты сервера.\n"
+                "Вот что я умею прямо сейчас:"
+            ),
+            color=BRAND_COLOR
+        )
+        if self.bot.user:
+            embed.set_thumbnail(url=self.bot.user.display_avatar.url)
+
+        embed.add_field(
+            name="🧠 Живой ИИ-чат",
+            value=(
+                "• Просто тегни меня или ответь на моё сообщение (`Reply`)\n"
+                "• Понимаю картинки (даже внутри Embed), знаю каналы, правила сервера, погоду, курсы и новости\n"
+                "• `/ai` — панель выбора нейросети, режима перегрузки, сценария и правил *(Админ)*"
+            ),
+            inline=False
+        )
+        embed.add_field(
+            name="🛡️ Защита, Верификация и Настройка",
+            value=(
+                "• `/setup_config` — настройка ролей, каналов, капчи, автокика, ловушки и войсов *(Админ)*\n"
+                "• `/settings` — текущая конфигурация и сброс параметров *(Админ)*\n"
+                "• `/send_verify_panel` / `/edit_verify_panel` — панель верификации с капчей *(Админ)*\n"
+                "• `/set_welcome` — настройка текста приветствия *(Админ)*\n"
+                "• `/unverify` — сброс верификации участника *(Модер)*"
+            ),
+            inline=False
+        )
+        embed.add_field(
+            name="🔨 Модерация",
+            value=(
+                "• `/timeout`, `/kick`, `/ban`, `/unban` — управление нарушителями\n"
+                "• `/clear` — очистка до 100 сообщений\n"
+                "• `/lock`, `/unlock`, `/slowmode` — контроль чата"
+            ),
+            inline=False
+        )
+        embed.add_field(
+            name="🔊 Приватные войсы и 🎭 Роли по кнопкам",
+            value=(
+                "• Зайди в канал-генератор войсов — создам личную комнату с кнопками управления\n"
+                "• `/add_role`, `/delete_role`, `/send_category_panel`, `/send_all_categories`, `/edit_category_panel`\n"
+                "• `/give_role`, `/take_role` — ручная выдача ролей"
+            ),
+            inline=False
+        )
+        embed.add_field(
+            name="📊 Утилиты",
+            value="• `/scan`, `/server_info`, `/avatar`, `/ping`",
+            inline=False
+        )
+        embed.set_footer(text=UNIFIED_FOOTER)
+        await inter.response.send_message(embed=embed, ephemeral=True)
 
     @commands.slash_command(
         contexts=GUILD_ONLY,
@@ -30,7 +93,7 @@ class Utility(commands.Cog):
         voice_hub_channel: Optional[disnake.VoiceChannel] = commands.Param(default=None, description="Голосовой канал «➕ Создать комнату»"),
         voice_room_template: Optional[str] = commands.Param(default=None, description="Шаблон имени приватной комнаты (например: ╠ 〘🔊〙 {user})"),
         create_voice_hub: bool = commands.Param(default=False, description="Автоматически создать категорию и канал для приватных войсов?"),
-        use_captcha: Optional[bool] = commands.Param(default=None, description="Требовать ввод капчи при верификации по умолчанию?"),
+        use_captcha: Optional[bool] = commands.Param(default=None, description="Требовать ввод капчи при верификации для новых аккаунтов?"),
         auto_kick_unverified: Optional[bool] = commands.Param(default=None, description="Кикать новичков, если они не прошли верификацию вовремя?"),
         verify_timeout_minutes: Optional[int] = commands.Param(default=None, description="Через сколько минут кикать неверифицированных (1-1440)", ge=1, le=1440),
     ):
@@ -135,7 +198,7 @@ class Utility(commands.Cog):
         embed.set_footer(text=UNIFIED_FOOTER)
         await inter.edit_original_response(embed=embed)
 
-    @commands.slash_command(contexts=GUILD_ONLY, name="settings", description="Посмотреть текущие настройки Aigis и управлять ими")
+    @commands.slash_command(contexts=GUILD_ONLY, name="settings", description="Посмотреть текущие настройки Mirei и управлять ими")
     @commands.default_member_permissions(administrator=True)
     async def settings(self, inter: disnake.ApplicationCommandInteraction):
         await inter.response.defer(ephemeral=True)
@@ -172,9 +235,9 @@ class Utility(commands.Cog):
         roles_info = f"Всего: **{len(guild_roles)}** шт. в категориях: {', '.join(f'`{c}`' for c in categories_set)}" if guild_roles else "⚪ Роли не добавлены"
 
         embed = disnake.Embed(
-            title="⚙️ Центр управления Aigis",
+            title="💠 Центр управления Mirei",
             description=f"Текущая конфигурация сервера **{inter.guild.name}**:",
-            color=P3_BLUE
+            color=BRAND_COLOR
         )
         if inter.guild.icon:
             embed.set_thumbnail(url=inter.guild.icon.url)
@@ -185,7 +248,7 @@ class Utility(commands.Cog):
         embed.add_field(name="📜 Канал аудита (логов)", value=l_chan, inline=False)
         embed.add_field(name="🔊 Создание приватных войсов", value=v_hub, inline=False)
         embed.add_field(name="🤫 Канал-ловушка (Тишина)", value=t_chan, inline=False)
-        embed.add_field(name="🤖 Модуль ИИ", value=ai_str, inline=False)
+        embed.add_field(name="🧠 Модуль ИИ", value=ai_str, inline=False)
         embed.add_field(name="🎭 Роли для выбора (в базе)", value=roles_info, inline=False)
         embed.set_footer(text=UNIFIED_FOOTER)
 
@@ -201,16 +264,17 @@ class Utility(commands.Cog):
         target = member or inter.author
         await inter.response.defer()
 
-        persona_sync = (target.id % 60) + 40
-        threat_level = "🟢 Участник" if not target.guild_permissions.administrator else "👑 Администратор"
+        age_days = (disnake.utils.utcnow() - target.created_at).days
+        threat_level = "👑 Администратор" if target.guild_permissions.administrator else "🟢 Участник"
+        top_role = target.top_role.mention if not target.top_role.is_default() else "Нет"
 
-        embed = disnake.Embed(title=f"🔍 Информация об участнике: {target.display_name}", color=P3_BLUE)
+        embed = disnake.Embed(title=f"🔍 Профиль участника: {target.display_name}", color=BRAND_COLOR)
         embed.set_thumbnail(url=target.display_avatar.url)
         embed.add_field(name="ID", value=f"`{target.id}`", inline=True)
         embed.add_field(name="Статус", value=threat_level, inline=True)
-        embed.add_field(name="Синхронизация", value=f"`{persona_sync}%`", inline=True)
+        embed.add_field(name="Высшая роль", value=top_role, inline=True)
         embed.add_field(name="На сервере с", value=target.joined_at.strftime("%d.%m.%Y") if target.joined_at else "N/A", inline=True)
-        embed.add_field(name="Аккаунт создан", value=target.created_at.strftime("%d.%m.%Y"), inline=True)
+        embed.add_field(name="Аккаунт создан", value=f"{target.created_at.strftime('%d.%m.%Y')} ({age_days} дн.)", inline=True)
         embed.add_field(name="Роли", value=f"**{len(target.roles) - 1}** шт.", inline=True)
         embed.set_footer(text=UNIFIED_FOOTER)
         await inter.edit_original_response(embed=embed)
@@ -224,10 +288,10 @@ class Utility(commands.Cog):
         backend_status = "🟢 В норме" if backend_ok else "🔴 Сбой связи"
         discord_ping = round(self.bot.latency * 1000)
 
-        embed = disnake.Embed(title="🤖 Диагностика систем Aigis", color=P3_BLUE)
+        embed = disnake.Embed(title="💠 Диагностика систем Mirei", color=BRAND_COLOR)
         embed.add_field(name="📡 Шлюз Discord", value=f"`{discord_ping} ms`", inline=True)
         embed.add_field(name="💾 База данных C#", value=f"`{backend_time} ms` ({backend_status})", inline=True)
-        embed.add_field(name="❤️ Статус", value="`Стабильно`", inline=True)
+        embed.add_field(name="⚡ Статус", value="`В сети`", inline=True)
         embed.set_footer(text=UNIFIED_FOOTER)
         await inter.edit_original_response(embed=embed)
 
@@ -238,7 +302,7 @@ class Utility(commands.Cog):
         bots = len([m for m in guild.members if m.bot])
         created_at = guild.created_at.strftime("%d.%m.%Y")
 
-        embed = disnake.Embed(title=f"📊 Информация о сервере: {guild.name}", color=P3_BLUE)
+        embed = disnake.Embed(title=f"📊 Информация о сервере: {guild.name}", color=BRAND_COLOR)
         if guild.icon:
             embed.set_thumbnail(url=guild.icon.url)
 
@@ -263,7 +327,7 @@ class Utility(commands.Cog):
         embed = disnake.Embed(
             title=f"🔍 Аватар: {target.display_name}",
             description=f"[Скачать оригинал]({avatar_url})",
-            color=P3_BLUE
+            color=BRAND_COLOR
         )
         embed.set_image(url=avatar_url)
         embed.set_footer(text=UNIFIED_FOOTER)
@@ -280,7 +344,7 @@ class Utility(commands.Cog):
             await inter.edit_original_response(content=f"Участник {target.mention} еще не зарегистрирован в базе.")
             return
 
-        embed = disnake.Embed(title=f"📋 Профиль в БД: {target.display_name}", color=P3_BLUE)
+        embed = disnake.Embed(title=f"📋 Профиль в БД: {target.display_name}", color=BRAND_COLOR)
         embed.set_thumbnail(url=target.display_avatar.url)
         embed.add_field(name="Discord ID", value=f"`{user_data.get('discordId')}`", inline=True)
         embed.add_field(name="Статус верификации", value="✅ Подтвержден" if user_data.get("isVerified") else "❌ Не верифицирован", inline=True)

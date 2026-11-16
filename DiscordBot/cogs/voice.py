@@ -4,7 +4,7 @@ import disnake
 from disnake.ext import commands
 from typing import Dict, Set, Optional
 from api import api
-from config import P3_BLUE, UNIFIED_FOOTER
+from config import BRAND_COLOR, UNIFIED_FOOTER
 
 
 def format_voice_room_name(custom_text: str, template: Optional[str], generator_name: str = "") -> str:
@@ -102,7 +102,6 @@ class VoiceHub(commands.Cog):
         channel: disnake.VoiceChannel,
         message: Optional[disnake.Message] = None
     ) -> Optional[int]:
-        """Определяет владельца приватной комнаты (из памяти, прав канала или Embed-панели)."""
         if channel.id in self.temp_channels:
             return self.temp_channels[channel.id]
 
@@ -118,15 +117,10 @@ class VoiceHub(commands.Cog):
 
         return None
 
-    async def _is_aigis_temp_room(self, vc: disnake.VoiceChannel, generator_id: int) -> Optional[int]:
-        """
-        Безопасно проверяет, является ли канал временной комнатой Aigis.
-        Возвращает ID владельца, если это наша комната, иначе None.
-        """
+    async def _is_mirei_temp_room(self, vc: disnake.VoiceChannel, generator_id: int) -> Optional[int]:
         if vc.id == generator_id or vc == vc.guild.afk_channel:
             return None
 
-        # Быстрая проверка по характерным правам владельца
         owner_id = None
         for target, overwrite in vc.overwrites.items():
             if isinstance(target, disnake.Member) and overwrite.manage_channels and overwrite.priority_speaker:
@@ -136,7 +130,6 @@ class VoiceHub(commands.Cog):
         if owner_id is None:
             return None
 
-        # Контрольная проверка: находил ли бот своё сообщение с панелью управления в этом войсе
         try:
             async for msg in vc.history(limit=10):
                 if (
@@ -153,7 +146,6 @@ class VoiceHub(commands.Cog):
 
     @commands.Cog.listener()
     async def on_ready(self):
-        """При старте бота находит оставшиеся приватные комнаты: пустые удаляет, занятые берёт на учёт."""
         if self._startup_synced:
             return
         self._startup_synced = True
@@ -171,7 +163,7 @@ class VoiceHub(commands.Cog):
 
             channels_to_scan = gen_ch.category.voice_channels if gen_ch.category else guild.voice_channels
             for vc in list(channels_to_scan):
-                owner_id = await self._is_aigis_temp_room(vc, gen_id)
+                owner_id = await self._is_mirei_temp_room(vc, gen_id)
                 if owner_id is None:
                     continue
 
@@ -315,7 +307,7 @@ class VoiceHub(commands.Cog):
                         "Используйте панель ниже для закрытия комнаты, установки лимита участников или переименования.\n"
                         "*Канал будет автоматически удален после выхода всех участников.*"
                     ),
-                    color=P3_BLUE
+                    color=BRAND_COLOR
                 )
                 embed.set_footer(text=UNIFIED_FOOTER)
                 await new_channel.send(embed=embed, view=VoiceControlView(is_locked=False))

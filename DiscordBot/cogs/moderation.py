@@ -3,7 +3,7 @@ import disnake
 from disnake.ext import commands
 from api import api
 from utils import check_moderation_target, send_log
-from config import GUILD_ONLY, AIGIS_GOLD, COMBAT_RED, TACTICAL_GREEN, UNIFIED_FOOTER
+from config import GUILD_ONLY, ACCENT_GOLD, COMBAT_RED, TACTICAL_GREEN, UNIFIED_FOOTER
 
 
 class Moderation(commands.Cog):
@@ -65,7 +65,7 @@ class Moderation(commands.Cog):
     async def slowmode(
         self,
         inter: disnake.ApplicationCommandInteraction,
-        seconds: int = commands.Param(description="Задержка в секундах (0 для отключения)", ge=0, le=21600)
+        seconds: int = commands.Param(description="Задержка в секух (0 для отключения)", ge=0, le=21600)
     ):
         await inter.response.defer(ephemeral=True)
         try:
@@ -99,7 +99,7 @@ class Moderation(commands.Cog):
             log_embed = disnake.Embed(
                 title="🔇 Применен таймаут",
                 description=f"**Нарушитель:** {member.mention} (`{member.id}`)\n**Модератор:** {inter.author.mention}\n**Время:** {minutes} мин.\n**Причина:** {reason}",
-                color=AIGIS_GOLD,
+                color=ACCENT_GOLD,
                 timestamp=disnake.utils.utcnow()
             )
             log_embed.set_footer(text=UNIFIED_FOOTER)
@@ -206,7 +206,7 @@ class Moderation(commands.Cog):
             embed = disnake.Embed(
                 title="🧹 Очистка чата завершена",
                 description=f"В канале {inter.channel.mention} удалено сообщений: **{len(deleted)}** шт.\n*(Сообщения старше 14 дней не затрагиваются)*",
-                color=AIGIS_GOLD
+                color=ACCENT_GOLD
             )
             embed.set_footer(text=UNIFIED_FOOTER)
             await inter.edit_original_response(embed=embed)

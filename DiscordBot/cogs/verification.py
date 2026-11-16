@@ -35,7 +35,7 @@ class CaptchaModal(disnake.ui.Modal):
                 required=True,
             )
         ]
-        super().__init__(title="🛡️ Защита от ботов (Aigis Captcha)", components=components)
+        super().__init__(title="💠 Защита от ботов (Mirei Captcha)", components=components)
 
     async def callback(self, inter: disnake.ModalInteraction):
         user_input = inter.text_values.get("captcha_input", "").strip().upper()
@@ -160,7 +160,6 @@ class Verification(commands.Cog):
         account_age_days = (disnake.utils.utcnow() - inter.author.created_at).days
         is_new_account = account_age_days < CAPTCHA_ACCOUNT_DAYS
 
-        # Капчу показываем ТОЛЬКО новым аккаунтам (младше CAPTCHA_ACCOUNT_DAYS дней)
         if cid == "persistent_verify_captcha" and is_new_account:
             await inter.response.send_modal(CaptchaModal(self))
         else:

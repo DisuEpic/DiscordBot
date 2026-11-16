@@ -4,7 +4,7 @@ from typing import Optional, Dict, List, Any
 from api import api
 from utils import add_chunked_role_fields, check_role_target
 from views import build_role_buttons_view
-from config import GUILD_ONLY, P3_BLUE, UNIFIED_FOOTER
+from config import GUILD_ONLY, BRAND_COLOR, UNIFIED_FOOTER
 
 MAX_ROLES_PER_CATEGORY = 25
 
@@ -35,7 +35,6 @@ class Roles(commands.Cog):
             if role in member.roles:
                 await member.remove_roles(role, reason="Снятие роли по кнопке")
             else:
-                # Если для этой панели включен режим "Только 1 роль" (single_choice=True)
                 if is_radio and inter.message and inter.message.components:
                     panel_role_ids = set()
                     for row in inter.message.components:
@@ -161,7 +160,7 @@ class Roles(commands.Cog):
         embed = disnake.Embed(
             title=title or f"🎭 Выбор ролей: {category}",
             description=description or "Нажмите на кнопку для получения/снятия роли:",
-            color=P3_BLUE
+            color=BRAND_COLOR
         )
         add_chunked_role_fields(embed, "Доступные роли:", target_roles)
         embed.set_footer(text=UNIFIED_FOOTER)
@@ -192,7 +191,7 @@ class Roles(commands.Cog):
             embed = disnake.Embed(
                 title=f"🎭 Выбор ролей: {cat_name}",
                 description="Выберите необходимые роли с помощью кнопок ниже:",
-                color=P3_BLUE
+                color=BRAND_COLOR
             )
             add_chunked_role_fields(embed, "Доступные роли:", subset)
             embed.set_footer(text=UNIFIED_FOOTER)
@@ -234,7 +233,6 @@ class Roles(commands.Cog):
             await inter.edit_original_response(content=f"⚠️ В категории **«{category}»** нет актуальных ролей.")
             return
 
-        # Если single_choice не передали явно — сохраняем тот режим, который уже стоял на кнопках этого сообщения
         if single_choice is None:
             was_radio = False
             if msg.components and msg.components[0].children:
@@ -248,7 +246,7 @@ class Roles(commands.Cog):
         embed_title = title or (old_embed.title if old_embed else f"🎭 Выбор ролей: {category}")
         embed_desc = description or (old_embed.description if old_embed else "Нажмите на кнопку для выбора:")
 
-        embed = disnake.Embed(title=embed_title, description=embed_desc, color=P3_BLUE)
+        embed = disnake.Embed(title=embed_title, description=embed_desc, color=BRAND_COLOR)
         add_chunked_role_fields(embed, "Доступные роли:", target_roles)
         embed.set_footer(text=UNIFIED_FOOTER)
 

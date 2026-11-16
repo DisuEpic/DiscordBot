@@ -15,25 +15,24 @@ intents.message_content = True
 intents.voice_states = True
 
 
-class AigisBot(commands.InteractionBot):
+class MireiBot(commands.AutoShardedInteractionBot):
     async def close(self):
         await api.close()
         await super().close()
 
 
-bot = AigisBot(intents=intents)
-
-STATUS_ACTIVITIES = [
-    disnake.Activity(type=disnake.ActivityType.watching, name="за порядком на Night Summer 🛡️"),
-    disnake.Activity(type=disnake.ActivityType.playing, name="в чате | Тегни @Aigis 🤖"),
-    disnake.Activity(type=disnake.ActivityType.listening, name="биение Папиллонного сердца ❤️"),
-    disnake.Activity(type=disnake.ActivityType.watching, name="за голосовыми комнатами 🔊"),
-]
+bot = MireiBot(intents=intents)
 
 
 @tasks.loop(seconds=45)
 async def rotate_presence():
-    for activity in STATUS_ACTIVITIES:
+    activities = [
+        disnake.Activity(type=disnake.ActivityType.watching, name=f"за {len(bot.guilds)} серверами 💠"),
+        disnake.Activity(type=disnake.ActivityType.playing, name="/help • Тегни @Mirei 🌸"),
+        disnake.Activity(type=disnake.ActivityType.listening, name="голосовые комнаты 🔊"),
+        disnake.Activity(type=disnake.ActivityType.watching, name="за порядком и безопасностью 🛡️"),
+    ]
+    for activity in activities:
         await bot.change_presence(activity=activity)
         await asyncio.sleep(45)
 
@@ -51,8 +50,8 @@ async def on_ready():
         rotate_presence.start()
 
     print("==========================================")
-    print(f"🤖 Aigis онлайн как: {bot.user} (ID: {bot.user.id})")
-    print("🛡️ Модули активны. Защита периметра запущена.")
+    print(f"💠 Mirei онлайн как: {bot.user} (ID: {bot.user.id})")
+    print(f"🛡️ Серверов под защитой: {len(bot.guilds)}. Модули активны.")
     print("==========================================")
 
 

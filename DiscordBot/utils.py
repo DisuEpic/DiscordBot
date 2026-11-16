@@ -3,7 +3,7 @@ from typing import Optional, List, Dict, Any
 from api import api
 from config import TACTICAL_GREEN, UNIFIED_FOOTER
 
-DEFAULT_WELCOME_TITLE = "👋 Добро пожаловать на {server}!"
+DEFAULT_WELCOME_TITLE = "🌸 Добро пожаловать на {server}!"
 DEFAULT_WELCOME_DESC = (
     "Приветствуем, {user}!\n"
     "Рады видеть тебя на нашем сервере!"
@@ -101,7 +101,7 @@ def check_moderation_target(inter: disnake.ApplicationCommandInteraction, target
     if target.id == inter.author.id:
         return "❌ Вы не можете применить это действие к самому себе."
     if target.id == inter.bot.user.id:
-        return "❌ Вы не можете применить это действие к модулю Aigis."
+        return "❌ Вы не можете применить это действие к боту Mirei."
     if target.id == inter.guild.owner_id:
         return "❌ Невозможно применить наказание к владельцу сервера."
     if inter.author.id != inter.guild.owner_id and target.top_role >= inter.author.top_role:

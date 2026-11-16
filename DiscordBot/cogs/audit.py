@@ -6,7 +6,7 @@ from collections import deque
 from api import api
 from utils import send_log, send_welcome_card
 from config import (
-    AIGIS_GOLD, COMBAT_RED, TACTICAL_GREEN, P3_BLUE, UNIFIED_FOOTER,
+    ACCENT_GOLD, COMBAT_RED, TACTICAL_GREEN, BRAND_COLOR, UNIFIED_FOOTER,
     RAID_WINDOW_SECONDS, RAID_JOIN_THRESHOLD, RAID_ALERT_COOLDOWN, YOUNG_ACCOUNT_DAYS
 )
 
@@ -153,7 +153,7 @@ class Audit(commands.Cog):
         embed = disnake.Embed(
             title="✏️ Сообщение отредактировано",
             description=f"**Автор:** {after.author.mention} (`{after.author.id}`)\n**Канал:** {after.channel.mention} ([Перейти к сообщению]({after.jump_url}))",
-            color=AIGIS_GOLD,
+            color=ACCENT_GOLD,
             timestamp=disnake.utils.utcnow()
         )
         embed.add_field(name="До:", value=old_content[:1000], inline=False)
@@ -195,7 +195,7 @@ class Audit(commands.Cog):
         embed = disnake.Embed(
             title="✏️ Сообщение отредактировано",
             description=f"**Автор:** <@{author.get('id', 0)}>\n**Канал:** <#{payload.channel_id}>\n**ID сообщения:** `{payload.message_id}`",
-            color=AIGIS_GOLD,
+            color=ACCENT_GOLD,
             timestamp=disnake.utils.utcnow()
         )
         embed.add_field(name="Новый текст:", value=(data.get("content") or "*Пусто*")[:1000], inline=False)
@@ -364,7 +364,7 @@ class Audit(commands.Cog):
             embed = disnake.Embed(
                 title="📝 Изменение никнейма",
                 description=f"**Участник:** {after.mention} (`{after.id}`)",
-                color=AIGIS_GOLD,
+                color=ACCENT_GOLD,
                 timestamp=disnake.utils.utcnow()
             )
             embed.set_thumbnail(url=after.display_avatar.url)
@@ -386,7 +386,7 @@ class Audit(commands.Cog):
                             f"**Модератор:** {mod_mention}\n"
                             f"**До:** {until_str}"
                         ),
-                        color=AIGIS_GOLD,
+                        color=ACCENT_GOLD,
                         timestamp=disnake.utils.utcnow()
                     )
                     embed.set_footer(text=UNIFIED_FOOTER)
@@ -421,7 +421,7 @@ class Audit(commands.Cog):
                 embed = disnake.Embed(
                     title="🎭 Изменение ролей участника",
                     description=f"**Участник:** {after.mention} (`{after.id}`)",
-                    color=P3_BLUE,
+                    color=BRAND_COLOR,
                     timestamp=disnake.utils.utcnow()
                 )
                 embed.set_thumbnail(url=after.display_avatar.url)
@@ -476,7 +476,7 @@ class Audit(commands.Cog):
                 embed = disnake.Embed(
                     title="🔀 Смена голосового канала",
                     description=f"**Участник:** {member.mention} (`{member.id}`)\n**Из:** {before.channel.mention} ➔ **В:** {after.channel.mention}",
-                    color=AIGIS_GOLD,
+                    color=ACCENT_GOLD,
                     timestamp=disnake.utils.utcnow()
                 )
             embed.set_footer(text=UNIFIED_FOOTER)
@@ -540,7 +540,7 @@ class Audit(commands.Cog):
         embed = disnake.Embed(
             title="⚙️ Параметры канала изменены",
             description=f"**Канал:** {after.mention}\n\n" + "\n".join(changes),
-            color=AIGIS_GOLD,
+            color=ACCENT_GOLD,
             timestamp=disnake.utils.utcnow()
         )
         embed.set_footer(text=UNIFIED_FOOTER)
