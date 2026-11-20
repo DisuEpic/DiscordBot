@@ -144,22 +144,18 @@ class VoiceHub(commands.Cog):
 
         return None
 
-    @commands.Cog.listener()
-    async def on_ready(self):
-        if self._startup_synced:
-            return
-        self._startup_synced = True
-
-        for guild in self.bot.guilds:
+    async def _sync_guild_voice_rooms(self, guild: disnake.Guild, semaphore: asyncio.Semaphore):
+        """Проверяет и очищает пустые приватные комнаты конкретного сервера после перезапуска."""
+        async with semaphore:
             cfg = await api.get_guild_config(str(guild.id)) or {}
             gen_id_str = (cfg.get("voice") or {}).get("generatorChannelId")
             if not gen_id_str or not str(gen_id_str).isdigit():
-                continue
+                return
 
             gen_id = int(gen_id_str)
             gen_ch = guild.get_channel(gen_id)
             if not isinstance(gen_ch, disnake.VoiceChannel):
-                continue
+                return
 
             channels_to_scan = gen_ch.category.voice_channels if gen_ch.category else guild.voice_channels
             for vc in list(channels_to_scan):
@@ -167,8 +163,8 @@ class VoiceHub(commands.Cog):
                 if owner_id is None:
                     continue
 
-                humans = [m for m in vc.members if not m.bot]
-                if len(humans) == 0:
+                has_humans = any(not m.bot for m in vc.members)
+                if not has_humans:
                     self.deleted_temp_ids.add(vc.id)
                     try:
                         await vc.delete(reason="Очистка пустой приватной комнаты после перезапуска бота")
@@ -177,6 +173,18 @@ class VoiceHub(commands.Cog):
                         pass
                 else:
                     self.temp_channels[vc.id] = owner_id
+
+    @commands.Cog.listener()
+    async def on_ready(self):
+        if self._startup_synced:
+            return
+        self._startup_synced = True
+
+        # Ограничиваем параллельность до 10 серверов одновременно, чтобы не перегружать API при старте
+        semaphore = asyncio.Semaphore(10)
+        tasks = [self._sync_guild_voice_rooms(guild, semaphore) for guild in list(self.bot.guilds)]
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
 
     def _has_room_access(self, inter: disnake.MessageInteraction, channel: disnake.VoiceChannel) -> bool:
         if inter.author.guild_permissions.administrator:
@@ -200,6 +208,7 @@ class VoiceHub(commands.Cog):
             return
 
         if cid == "voice_ctrl_lock":
+            await inter.response.defer()
             default_ow = channel.overwrites_for(inter.guild.default_role)
             new_locked = not (default_ow.connect is False)
 
@@ -211,7 +220,7 @@ class VoiceHub(commands.Cog):
                 if new_locked
                 else "🔓 **Комната открыта** для всех участников."
             )
-            await inter.response.edit_message(view=VoiceControlView(is_locked=new_locked))
+            await inter.edit_original_response(view=VoiceControlView(is_locked=new_locked))
             await inter.followup.send(status_text, ephemeral=True)
 
         elif cid == "voice_ctrl_rename":
@@ -315,7 +324,7 @@ class VoiceHub(commands.Cog):
                 pass
 
         if before.channel and before.channel.id in self.temp_channels:
-            if len([m for m in before.channel.members if not m.bot]) == 0:
+            if not any(not m.bot for m in before.channel.members):
                 self.temp_channels.pop(before.channel.id, None)
                 self.deleted_temp_ids.add(before.channel.id)
                 try:

@@ -3,16 +3,8 @@
   "WorkspaceRootPath": "C:\\Users\\theep\\OneDrive\\\u0420\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\Aigis-project\\Backend\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{A83F252A-7CD7-33CC-82AF-F3645C4A8C9B}|Backend\\DiscordBot_API.csproj|c:\\users\\theep\\onedrive\\\u0440\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\aigis-project\\backend\\backend\\controllers\\configcontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{A83F252A-7CD7-33CC-82AF-F3645C4A8C9B}|Backend\\DiscordBot_API.csproj|solutionrelative:backend\\controllers\\configcontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{A83F252A-7CD7-33CC-82AF-F3645C4A8C9B}|Backend\\DiscordBot_API.csproj|c:\\users\\theep\\onedrive\\\u0440\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\aigis-project\\backend\\backend\\dto\\dtos.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{A83F252A-7CD7-33CC-82AF-F3645C4A8C9B}|Backend\\DiscordBot_API.csproj|solutionrelative:backend\\dto\\dtos.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{A83F252A-7CD7-33CC-82AF-F3645C4A8C9B}|Backend\\DiscordBot_API.csproj|c:\\users\\theep\\onedrive\\\u0440\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\aigis-project\\backend\\backend\\data\\appdbcontext.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{A83F252A-7CD7-33CC-82AF-F3645C4A8C9B}|Backend\\DiscordBot_API.csproj|solutionrelative:backend\\data\\appdbcontext.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+      "AbsoluteMoniker": "D:0:0:{A83F252A-7CD7-33CC-82AF-F3645C4A8C9B}|Backend\\DiscordBot_API.csproj|c:\\users\\theep\\onedrive\\\u0440\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\aigis-project\\backend\\backend\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{A83F252A-7CD7-33CC-82AF-F3645C4A8C9B}|Backend\\DiscordBot_API.csproj|solutionrelative:backend\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{A83F252A-7CD7-33CC-82AF-F3645C4A8C9B}|Backend\\DiscordBot_API.csproj|c:\\users\\theep\\onedrive\\\u0440\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\aigis-project\\backend\\backend\\models.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
@@ -27,12 +19,24 @@
       "RelativeMoniker": "D:0:0:{A83F252A-7CD7-33CC-82AF-F3645C4A8C9B}|Backend\\DiscordBot_API.csproj|solutionrelative:backend\\controllers\\rolescontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{A83F252A-7CD7-33CC-82AF-F3645C4A8C9B}|Backend\\DiscordBot_API.csproj|c:\\users\\theep\\onedrive\\\u0440\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\aigis-project\\backend\\backend\\migrations\\20261116071420_dropoldserverconfigs.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{A83F252A-7CD7-33CC-82AF-F3645C4A8C9B}|Backend\\DiscordBot_API.csproj|solutionrelative:backend\\migrations\\20261116071420_dropoldserverconfigs.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+      "AbsoluteMoniker": "D:0:0:{A83F252A-7CD7-33CC-82AF-F3645C4A8C9B}|Backend\\DiscordBot_API.csproj|c:\\users\\theep\\onedrive\\\u0440\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\aigis-project\\backend\\backend\\controllers\\configcontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{A83F252A-7CD7-33CC-82AF-F3645C4A8C9B}|Backend\\DiscordBot_API.csproj|solutionrelative:backend\\controllers\\configcontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{A83F252A-7CD7-33CC-82AF-F3645C4A8C9B}|Backend\\DiscordBot_API.csproj|c:\\users\\theep\\onedrive\\\u0440\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\aigis-project\\backend\\backend\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{A83F252A-7CD7-33CC-82AF-F3645C4A8C9B}|Backend\\DiscordBot_API.csproj|solutionrelative:backend\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+      "AbsoluteMoniker": "D:0:0:{A83F252A-7CD7-33CC-82AF-F3645C4A8C9B}|Backend\\DiscordBot_API.csproj|c:\\users\\theep\\onedrive\\\u0440\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\aigis-project\\backend\\backend\\migrations\\20261116080249_addstatsconfig.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{A83F252A-7CD7-33CC-82AF-F3645C4A8C9B}|Backend\\DiscordBot_API.csproj|solutionrelative:backend\\migrations\\20261116080249_addstatsconfig.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A83F252A-7CD7-33CC-82AF-F3645C4A8C9B}|Backend\\DiscordBot_API.csproj|c:\\users\\theep\\onedrive\\\u0440\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\aigis-project\\backend\\backend\\dto\\dtos.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{A83F252A-7CD7-33CC-82AF-F3645C4A8C9B}|Backend\\DiscordBot_API.csproj|solutionrelative:backend\\dto\\dtos.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A83F252A-7CD7-33CC-82AF-F3645C4A8C9B}|Backend\\DiscordBot_API.csproj|c:\\users\\theep\\onedrive\\\u0440\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\aigis-project\\backend\\backend\\data\\appdbcontext.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{A83F252A-7CD7-33CC-82AF-F3645C4A8C9B}|Backend\\DiscordBot_API.csproj|solutionrelative:backend\\data\\appdbcontext.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A83F252A-7CD7-33CC-82AF-F3645C4A8C9B}|Backend\\DiscordBot_API.csproj|c:\\users\\theep\\onedrive\\\u0440\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\aigis-project\\backend\\backend\\migrations\\20261116071420_dropoldserverconfigs.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{A83F252A-7CD7-33CC-82AF-F3645C4A8C9B}|Backend\\DiscordBot_API.csproj|solutionrelative:backend\\migrations\\20261116071420_dropoldserverconfigs.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{A83F252A-7CD7-33CC-82AF-F3645C4A8C9B}|Backend\\DiscordBot_API.csproj|c:\\users\\theep\\onedrive\\\u0440\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\aigis-project\\backend\\backend\\migrations\\20261105132714_aisettingsupdate.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
@@ -100,7 +104,7 @@
         },
         {
           "DockedWidth": 30,
-          "SelectedChildIndex": 6,
+          "SelectedChildIndex": 8,
           "Children": [
             {
               "$type": "Bookmark",
@@ -108,20 +112,20 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 6,
-              "Title": "20261116071420_DropOldServerConfigs.cs",
-              "DocumentMoniker": "C:\\Users\\theep\\OneDrive\\\u0420\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\Aigis-project\\Backend\\Backend\\Migrations\\20261116071420_DropOldServerConfigs.cs",
-              "RelativeDocumentMoniker": "Backend\\Migrations\\20261116071420_DropOldServerConfigs.cs",
-              "ToolTip": "C:\\Users\\theep\\OneDrive\\\u0420\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\Aigis-project\\Backend\\Backend\\Migrations\\20261116071420_DropOldServerConfigs.cs",
-              "RelativeToolTip": "Backend\\Migrations\\20261116071420_DropOldServerConfigs.cs",
-              "ViewState": "AgIAACEAAAAAAAAAAAAowAAAAAAAAAAAAAAAAA==",
+              "DocumentIndex": 5,
+              "Title": "20261116080249_AddStatsConfig.cs",
+              "DocumentMoniker": "C:\\Users\\theep\\OneDrive\\\u0420\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\Aigis-project\\Backend\\Backend\\Migrations\\20261116080249_AddStatsConfig.cs",
+              "RelativeDocumentMoniker": "Backend\\Migrations\\20261116080249_AddStatsConfig.cs",
+              "ToolTip": "C:\\Users\\theep\\OneDrive\\\u0420\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\Aigis-project\\Backend\\Backend\\Migrations\\20261116080249_AddStatsConfig.cs",
+              "RelativeToolTip": "Backend\\Migrations\\20261116080249_AddStatsConfig.cs",
+              "ViewState": "AgIAAB8AAAAAAAAAAAAgwAAAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-11-16T07:14:23.953Z",
+              "WhenOpened": "2026-11-16T08:13:31.831Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 2,
+              "DocumentIndex": 7,
               "Title": "AppDbContext.cs",
               "DocumentMoniker": "C:\\Users\\theep\\OneDrive\\\u0420\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\Aigis-project\\Backend\\Backend\\Data\\AppDbContext.cs",
               "RelativeDocumentMoniker": "Backend\\Data\\AppDbContext.cs",
@@ -129,12 +133,11 @@
               "RelativeToolTip": "Backend\\Data\\AppDbContext.cs",
               "ViewState": "AgIAAEgAAAAAAAAAAAAqwHYAAAALAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-11-15T18:15:25.434Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-11-15T18:15:25.434Z"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 1,
+              "DocumentIndex": 6,
               "Title": "DTOs.cs",
               "DocumentMoniker": "C:\\Users\\theep\\OneDrive\\\u0420\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\Aigis-project\\Backend\\Backend\\DTO\\DTOs.cs",
               "RelativeDocumentMoniker": "Backend\\DTO\\DTOs.cs",
@@ -142,12 +145,11 @@
               "RelativeToolTip": "Backend\\DTO\\DTOs.cs",
               "ViewState": "AgIAADMAAAAAAAAAAAAiwFgAAAATAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-10-26T14:29:39.599Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-10-26T14:29:39.599Z"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 3,
+              "DocumentIndex": 1,
               "Title": "Models.cs",
               "DocumentMoniker": "C:\\Users\\theep\\OneDrive\\\u0420\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\Aigis-project\\Backend\\Backend\\Models.cs",
               "RelativeDocumentMoniker": "Backend\\Models.cs",
@@ -160,50 +162,71 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 5,
+              "DocumentIndex": 3,
               "Title": "RolesController.cs",
               "DocumentMoniker": "C:\\Users\\theep\\OneDrive\\\u0420\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\Aigis-project\\Backend\\Backend\\Controllers\\RolesController.cs",
               "RelativeDocumentMoniker": "Backend\\Controllers\\RolesController.cs",
               "ToolTip": "C:\\Users\\theep\\OneDrive\\\u0420\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\Aigis-project\\Backend\\Backend\\Controllers\\RolesController.cs",
               "RelativeToolTip": "Backend\\Controllers\\RolesController.cs",
-              "ViewState": "AgIAAFQAAAAAAAAAAAAmwAAAAAAAAAAAAAAAAA==",
+              "ViewState": "AgIAACIAAAAAAAAAAAAcwH4AAAABAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2026-10-26T15:26:01.723Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 0,
+              "DocumentIndex": 4,
               "Title": "ConfigController.cs",
               "DocumentMoniker": "C:\\Users\\theep\\OneDrive\\\u0420\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\Aigis-project\\Backend\\Backend\\Controllers\\ConfigController.cs",
               "RelativeDocumentMoniker": "Backend\\Controllers\\ConfigController.cs",
               "ToolTip": "C:\\Users\\theep\\OneDrive\\\u0420\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\Aigis-project\\Backend\\Backend\\Controllers\\ConfigController.cs",
               "RelativeToolTip": "Backend\\Controllers\\ConfigController.cs",
-              "ViewState": "AgIAAFQAAAAAAAAAAAAIwGAAAAA5AAAAAAAAAA==",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAF8BAAABAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2026-10-22T14:57:17.621Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 4,
+              "DocumentIndex": 2,
               "Title": "UsersController.cs",
               "DocumentMoniker": "C:\\Users\\theep\\OneDrive\\\u0420\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\Aigis-project\\Backend\\Backend\\Controllers\\UsersController.cs",
               "RelativeDocumentMoniker": "Backend\\Controllers\\UsersController.cs",
               "ToolTip": "C:\\Users\\theep\\OneDrive\\\u0420\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\Aigis-project\\Backend\\Backend\\Controllers\\UsersController.cs",
               "RelativeToolTip": "Backend\\Controllers\\UsersController.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAIQAAAApAAAAAAAAAA==",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAKsAAAABAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2026-10-26T14:42:27.074Z",
               "EditorCaption": ""
             },
             {
-              "$type": "Bookmark",
-              "Name": "ST:0:0:{34e76e81-ee4a-11d0-ae2e-00a0c90fffc3}"
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "Program.cs",
+              "DocumentMoniker": "C:\\Users\\theep\\OneDrive\\\u0420\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\Aigis-project\\Backend\\Backend\\Program.cs",
+              "RelativeDocumentMoniker": "Backend\\Program.cs",
+              "ToolTip": "C:\\Users\\theep\\OneDrive\\\u0420\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\Aigis-project\\Backend\\Backend\\Program.cs",
+              "RelativeToolTip": "Backend\\Program.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAABEAAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-11-02T10:24:50.695Z",
+              "EditorCaption": ""
             },
             {
               "$type": "Document",
               "DocumentIndex": 8,
+              "Title": "20261116071420_DropOldServerConfigs.cs",
+              "DocumentMoniker": "C:\\Users\\theep\\OneDrive\\\u0420\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\Aigis-project\\Backend\\Backend\\Migrations\\20261116071420_DropOldServerConfigs.cs",
+              "RelativeDocumentMoniker": "Backend\\Migrations\\20261116071420_DropOldServerConfigs.cs",
+              "ToolTip": "C:\\Users\\theep\\OneDrive\\\u0420\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\Aigis-project\\Backend\\Backend\\Migrations\\20261116071420_DropOldServerConfigs.cs",
+              "RelativeToolTip": "Backend\\Migrations\\20261116071420_DropOldServerConfigs.cs",
+              "ViewState": "AgIAACEAAAAAAAAAAAAowAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-11-16T07:14:23.953Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 9,
               "Title": "20261105132714_AiSettingsUpdate.cs",
               "DocumentMoniker": "C:\\Users\\theep\\OneDrive\\\u0420\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\Aigis-project\\Backend\\Backend\\Migrations\\20261105132714_AiSettingsUpdate.cs",
               "RelativeDocumentMoniker": "Backend\\Migrations\\20261105132714_AiSettingsUpdate.cs",
@@ -215,7 +238,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 13,
+              "DocumentIndex": 14,
               "Title": "Snowflake.cs",
               "DocumentMoniker": "C:\\Users\\theep\\OneDrive\\\u0420\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\Aigis-project\\Backend\\Backend\\Helpers\\Snowflake.cs",
               "RelativeDocumentMoniker": "Backend\\Helpers\\Snowflake.cs",
@@ -227,20 +250,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 7,
-              "Title": "Program.cs",
-              "DocumentMoniker": "C:\\Users\\theep\\OneDrive\\\u0420\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\Aigis-project\\Backend\\Backend\\Program.cs",
-              "RelativeDocumentMoniker": "Backend\\Program.cs",
-              "ToolTip": "C:\\Users\\theep\\OneDrive\\\u0420\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\Aigis-project\\Backend\\Backend\\Program.cs",
-              "RelativeToolTip": "Backend\\Program.cs",
-              "ViewState": "AgIAABYAAAAAAAAAAAAUwDEAAAABAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-11-02T10:24:50.695Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 10,
+              "DocumentIndex": 11,
               "Title": "AppDbContextModelSnapshot.cs",
               "DocumentMoniker": "C:\\Users\\theep\\OneDrive\\\u0420\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\Aigis-project\\Backend\\Backend\\Migrations\\AppDbContextModelSnapshot.cs",
               "RelativeDocumentMoniker": "Backend\\Migrations\\AppDbContextModelSnapshot.cs",
@@ -252,7 +262,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 9,
+              "DocumentIndex": 10,
               "Title": "20261115181928_AddModularConfigs.cs",
               "DocumentMoniker": "C:\\Users\\theep\\OneDrive\\\u0420\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\Aigis-project\\Backend\\Backend\\Migrations\\20261115181928_AddModularConfigs.cs",
               "RelativeDocumentMoniker": "Backend\\Migrations\\20261115181928_AddModularConfigs.cs",
@@ -264,7 +274,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 11,
+              "DocumentIndex": 12,
               "Title": "appsettings.json",
               "DocumentMoniker": "C:\\Users\\theep\\OneDrive\\\u0420\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\Aigis-project\\Backend\\Backend\\appsettings.json",
               "RelativeDocumentMoniker": "Backend\\appsettings.json",
@@ -276,7 +286,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 12,
+              "DocumentIndex": 13,
               "Title": "20261102092954_AddVoiceRoomTemplate.cs",
               "DocumentMoniker": "C:\\Users\\theep\\OneDrive\\\u0420\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\Aigis-project\\Backend\\Backend\\Migrations\\20261102092954_AddVoiceRoomTemplate.cs",
               "RelativeDocumentMoniker": "Backend\\Migrations\\20261102092954_AddVoiceRoomTemplate.cs",
@@ -288,7 +298,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 14,
+              "DocumentIndex": 15,
               "Title": "20261026145710_AddWelcomeAndVoiceConfig.cs",
               "DocumentMoniker": "C:\\Users\\theep\\OneDrive\\\u0420\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\Aigis-project\\Backend\\Backend\\Migrations\\20261026145710_AddWelcomeAndVoiceConfig.cs",
               "RelativeDocumentMoniker": "Backend\\Migrations\\20261026145710_AddWelcomeAndVoiceConfig.cs",
@@ -297,6 +307,10 @@
               "ViewState": "AgIAAAgAAAAAAAAAAAAQwAAAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2026-11-02T09:30:12.467Z"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{34e76e81-ee4a-11d0-ae2e-00a0c90fffc3}"
             }
           ]
         }

@@ -43,11 +43,7 @@ PROMPT_OVERDRIVE_BASE = (
 GEMINI_MODELS_LIST = [
     "gemini-3.5-flash",
     "gemini-3.8-flash",
-    "gemini-3.6-flash",
-    "gemini-3.5-flash-lite",
-    "gemini-3.1-flash-lite",
-    "gemini-2.5-flash",
-    "gemini-2.0-flash",
+    "gemini-3.5-flash-lite"
 ]
 
 PROVIDER_NAMES = {
@@ -68,6 +64,12 @@ SAFETY_SETTINGS_MODERATE = [
 
 ALLOWED_IMAGE_TYPES = {"image/png", "image/jpeg", "image/webp", "image/gif"}
 WEEKDAYS_RU = ["Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота", "Воскресенье"]
+
+# Настраиваемые параметры оптимизации памяти и кэша
+MEMORY_TTL_SECONDS = 3600       # Хранить историю диалога в канале 1 час бездействия
+MAX_MEMORY_CHANNELS = 500       # Максимум активных каналов в ОЗУ
+MAX_RULES_CACHE_GUILDS = 500    # Максимум серверов в кэше правил
+RATES_CACHE_TTL_SECONDS = 900   # Кэш курсов валют и крипты на 15 минут
 
 WMO_WEATHER_CODES = {
     0: "Ясно ☀️", 1: "Преимущественно ясно 🌤️", 2: "Переменная облачность ⛅", 3: "Пасмурно ☁️",
@@ -119,7 +121,7 @@ class AICustomizeModal(disnake.ui.Modal):
             aiCustomScenario=scenario or None,
             aiCustomRules=rules or None
         )
-        self.cog.memory.pop(inter.channel_id, None)
+        self.cog._clear_channel_memory(inter.channel_id)
 
         embed = await self.panel_view.build_embed(inter.guild)
         await inter.edit_original_response(embed=embed, view=self.panel_view)
@@ -236,7 +238,7 @@ class AIControlPanelView(disnake.ui.View):
         cur_mode = cfg.get("aiMode") or "standard"
         new_mode = "overdrive" if cur_mode == "standard" else "standard"
         await self.cog.update_ai_config(self.guild_id, aiMode=new_mode)
-        self.cog.memory.pop(self.channel_id, None)
+        self.cog._clear_channel_memory(self.channel_id)
         embed = await self.build_embed(inter.guild)
         await inter.edit_original_response(embed=embed, view=self)
 
@@ -258,7 +260,7 @@ class AIControlPanelView(disnake.ui.View):
     async def reset_memory_btn(self, button: disnake.ui.Button, inter: disnake.MessageInteraction):
         if not await self._check_access(inter):
             return
-        self.cog.memory.pop(inter.channel.id, None)
+        self.cog._clear_channel_memory(inter.channel.id)
         await inter.response.send_message("♻️ Память диалога Mirei в этом канале очищена!", ephemeral=True)
 
 
@@ -277,20 +279,47 @@ class AIChat(commands.Cog):
 
         self._session: Optional[aiohttp.ClientSession] = None
 
+        # Память диалогов: channel_id -> deque, плюс время последней активности
         self.memory: Dict[int, deque] = {}
+        self._memory_last_active: Dict[int, float] = {}
+
         self.cooldowns: Dict[int, float] = {}
         self.cooldown_seconds = 3.0
 
         self._local_fallback_cfg: Dict[int, Dict[str, Any]] = {}
         self.rules_cache: Dict[int, Tuple[float, str]] = {}
+        self._rates_cache: Optional[Tuple[float, str]] = None
 
     def cog_unload(self):
         if self._session and not self._session.closed:
             asyncio.create_task(self._session.close())
 
+    def _clear_channel_memory(self, channel_id: int):
+        self.memory.pop(channel_id, None)
+        self._memory_last_active.pop(channel_id, None)
+
+    def _get_channel_history(self, channel_id: int) -> deque:
+        """Возвращает историю диалога канала и очищает устаревшие ветки из памяти."""
+        now = time.time()
+        last_ts = self._memory_last_active.get(channel_id, 0.0)
+        if last_ts and (now - last_ts) > MEMORY_TTL_SECONDS:
+            self._clear_channel_memory(channel_id)
+
+        if len(self.memory) > MAX_MEMORY_CHANNELS:
+            expired = [cid for cid, ts in self._memory_last_active.items() if (now - ts) > MEMORY_TTL_SECONDS]
+            for cid in expired:
+                self._clear_channel_memory(cid)
+            if len(self.memory) > MAX_MEMORY_CHANNELS:
+                oldest = sorted(self._memory_last_active.items(), key=lambda x: x[1])[: len(self.memory) // 5]
+                for cid, _ in oldest:
+                    self._clear_channel_memory(cid)
+
+        self._memory_last_active[channel_id] = now
+        return self.memory.setdefault(channel_id, deque(maxlen=12))
+
     async def _get_session(self) -> aiohttp.ClientSession:
         if self._session is None or self._session.closed:
-            connector = aiohttp.TCPConnector(family=socket.AF_INET, limit=50)
+            connector = aiohttp.TCPConnector(family=socket.AF_INET, limit=50, ttl_dns_cache=300)
             self._session = aiohttp.ClientSession(
                 connector=connector,
                 timeout=aiohttp.ClientTimeout(total=25)
@@ -320,6 +349,8 @@ class AIChat(commands.Cog):
     async def update_ai_config(self, guild_id: int, **kwargs) -> bool:
         current = await self.get_ai_config(guild_id)
         current.update(kwargs)
+        if len(self._local_fallback_cfg) > MAX_RULES_CACHE_GUILDS:
+            self._local_fallback_cfg.clear()
         self._local_fallback_cfg[guild_id] = current
 
         ai_payload = {
@@ -458,6 +489,11 @@ class AIChat(commands.Cog):
         cached = self.rules_cache.get(guild.id)
         if cached and (now - cached[0]) < 1800:
             return cached[1]
+
+        if len(self.rules_cache) > MAX_RULES_CACHE_GUILDS:
+            expired = [gid for gid, (ts, _) in self.rules_cache.items() if (now - ts) >= 1800]
+            for gid in expired:
+                self.rules_cache.pop(gid, None)
 
         rules_channel: Optional[disnake.TextChannel] = guild.rules_channel
         if not rules_channel:
@@ -659,40 +695,56 @@ class AIChat(commands.Cog):
         return None
 
     async def _fetch_currency_rates(self) -> Optional[str]:
+        now = time.time()
+        if self._rates_cache and (now - self._rates_cache[0]) < RATES_CACHE_TTL_SECONDS:
+            return self._rates_cache[1]
+
         session = await self._get_session()
-        lines = []
-        try:
-            async with session.get("https://www.cbr-xml-daily.ru/daily_json.js", timeout=aiohttp.ClientTimeout(total=5)) as resp:
-                if resp.status == 200:
-                    raw = await resp.text()
-                    data = json.loads(raw)
-                    val = data.get("Valute", {})
-                    usd = val.get("USD", {}).get("Value")
-                    eur = val.get("EUR", {}).get("Value")
-                    cny = val.get("CNY", {}).get("Value")
-                    kzt = val.get("KZT", {}).get("Value")
-                    if usd and eur:
-                        lines.append(
-                            f"Официальный курс ЦБ РФ: 1 USD (доллар) = {usd:.2f} руб., "
-                            f"1 EUR (евро) = {eur:.2f} руб., 1 CNY (юань) = {cny:.2f} руб., 100 KZT (тенге) = {kzt:.2f} руб."
-                        )
-        except Exception:
-            pass
 
-        try:
-            cg_url = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,the-open-network&vs_currencies=usd,rub"
-            async with session.get(cg_url, timeout=aiohttp.ClientTimeout(total=4)) as resp:
-                if resp.status == 200:
-                    cg = await resp.json()
-                    btc_usd = cg.get("bitcoin", {}).get("usd")
-                    ton_usd = cg.get("the-open-network", {}).get("usd")
-                    ton_rub = cg.get("the-open-network", {}).get("rub")
-                    if btc_usd:
-                        lines.append(f"Курс крипты: Bitcoin (BTC) = ${btc_usd:,}, TON = ${ton_usd} ({ton_rub} руб.).")
-        except Exception:
-            pass
+        async def get_cbr() -> Optional[str]:
+            try:
+                async with session.get("https://www.cbr-xml-daily.ru/daily_json.js", timeout=aiohttp.ClientTimeout(total=5)) as resp:
+                    if resp.status == 200:
+                        raw = await resp.text()
+                        data = json.loads(raw)
+                        val = data.get("Valute", {})
+                        usd = val.get("USD", {}).get("Value")
+                        eur = val.get("EUR", {}).get("Value")
+                        cny = val.get("CNY", {}).get("Value")
+                        kzt = val.get("KZT", {}).get("Value")
+                        if usd and eur:
+                            return (
+                                f"Официальный курс ЦБ РФ: 1 USD (доллар) = {usd:.2f} руб., "
+                                f"1 EUR (евро) = {eur:.2f} руб., 1 CNY (юань) = {cny:.2f} руб., 100 KZT (тенге) = {kzt:.2f} руб."
+                            )
+            except Exception:
+                pass
+            return None
 
-        return "\n".join(lines) if lines else None
+        async def get_crypto() -> Optional[str]:
+            try:
+                cg_url = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,the-open-network&vs_currencies=usd,rub"
+                async with session.get(cg_url, timeout=aiohttp.ClientTimeout(total=4)) as resp:
+                    if resp.status == 200:
+                        cg = await resp.json()
+                        btc_usd = cg.get("bitcoin", {}).get("usd")
+                        ton_usd = cg.get("the-open-network", {}).get("usd")
+                        ton_rub = cg.get("the-open-network", {}).get("rub")
+                        if btc_usd:
+                            return f"Курс крипты: Bitcoin (BTC) = ${btc_usd:,}, TON = ${ton_usd} ({ton_rub} руб.)."
+            except Exception:
+                pass
+            return None
+
+        # Запрашиваем ЦБ РФ и CoinGecko параллельно вместо последовательного ожидания
+        cbr_res, crypto_res = await asyncio.gather(get_cbr(), get_crypto())
+        lines = [line for line in (cbr_res, crypto_res) if line]
+
+        if lines:
+            result = "\n".join(lines)
+            self._rates_cache = (now, result)
+            return result
+        return None
 
     async def _fetch_web_search(self, query: str) -> Optional[str]:
         clean_q = re.sub(
@@ -705,34 +757,42 @@ class AIChat(commands.Cog):
             clean_q = query
 
         session = await self._get_session()
-        results = []
 
-        try:
-            g_url = f"https://news.google.com/rss/search?q={urllib.parse.quote(clean_q[:120])}&hl=ru&gl=RU&ceid=RU:ru"
-            async with session.get(g_url, timeout=aiohttp.ClientTimeout(total=5)) as resp:
-                if resp.status == 200:
-                    xml_text = await resp.text()
-                    items = re.findall(r"<item>.*?<title>(.*?)</title>.*?<pubDate>(.*?)</pubDate>.*?</item>", xml_text, flags=re.DOTALL)
-                    for title, pub_date in items[:4]:
-                        clean_title = html.unescape(re.sub(r"<[^>]+>", "", title)).strip()
-                        results.append(f"• Новость ({pub_date[:16]}): {clean_title}")
-        except Exception:
-            pass
+        async def search_news() -> List[str]:
+            items_out = []
+            try:
+                g_url = f"https://news.google.com/rss/search?q={urllib.parse.quote(clean_q[:120])}&hl=ru&gl=RU&ceid=RU:ru"
+                async with session.get(g_url, timeout=aiohttp.ClientTimeout(total=5)) as resp:
+                    if resp.status == 200:
+                        xml_text = await resp.text()
+                        items = re.findall(r"<item>.*?<title>(.*?)</title>.*?<pubDate>(.*?)</pubDate>.*?</item>", xml_text, flags=re.DOTALL)
+                        for title, pub_date in items[:4]:
+                            clean_title = html.unescape(re.sub(r"<[^>]+>", "", title)).strip()
+                            items_out.append(f"• Новость ({pub_date[:16]}): {clean_title}")
+            except Exception:
+                pass
+            return items_out
 
-        try:
-            w_url = f"https://ru.wikipedia.org/w/api.php?action=query&list=search&srsearch={urllib.parse.quote(clean_q[:120])}&utf8=&format=json&srlimit=3"
-            headers = {"User-Agent": "MireiDiscordBot/2.0"}
-            async with session.get(w_url, headers=headers, timeout=aiohttp.ClientTimeout(total=5)) as resp:
-                if resp.status == 200:
-                    wdata = await resp.json()
-                    for item in wdata.get("query", {}).get("search", [])[:3]:
-                        t = item.get("title", "")
-                        snip = html.unescape(re.sub(r"<[^>]+>", "", item.get("snippet", ""))).strip()
-                        if snip:
-                            results.append(f"• Справка ({t}): {snip}")
-        except Exception:
-            pass
+        async def search_wiki() -> List[str]:
+            items_out = []
+            try:
+                w_url = f"https://ru.wikipedia.org/w/api.php?action=query&list=search&srsearch={urllib.parse.quote(clean_q[:120])}&utf8=&format=json&srlimit=3"
+                headers = {"User-Agent": "MireiDiscordBot/2.0"}
+                async with session.get(w_url, headers=headers, timeout=aiohttp.ClientTimeout(total=5)) as resp:
+                    if resp.status == 200:
+                        wdata = await resp.json()
+                        for item in wdata.get("query", {}).get("search", [])[:3]:
+                            t = item.get("title", "")
+                            snip = html.unescape(re.sub(r"<[^>]+>", "", item.get("snippet", ""))).strip()
+                            if snip:
+                                items_out.append(f"• Справка ({t}): {snip}")
+            except Exception:
+                pass
+            return items_out
 
+        # Параллельный поиск в новостях и Википедии ускоряет ответ в 2 раза
+        news_res, wiki_res = await asyncio.gather(search_news(), search_wiki())
+        results = news_res + wiki_res
         return "\n".join(results) if results else None
 
     async def _gather_internet_context(self, user_text: str) -> str:
@@ -1028,7 +1088,7 @@ class AIChat(commands.Cog):
     ) -> Optional[str]:
         guild_id = guild.id if guild else 0
         channel_id = getattr(channel, "id", 0)
-        history = self.memory.setdefault(channel_id, deque(maxlen=12))
+        history = self._get_channel_history(channel_id)
 
         cfg = await self.get_ai_config(guild_id) if guild else {}
 
@@ -1087,6 +1147,7 @@ class AIChat(commands.Cog):
             history_text = f"{author.display_name}: {user_text} [Прикреплено изображение]" if image_data else f"{author.display_name}: {user_text}"
             history.append({"role": "user", "content": history_text})
             history.append({"role": "assistant", "content": reply})
+            self._memory_last_active[channel_id] = time.time()
             return reply
 
         return None
@@ -1127,6 +1188,9 @@ class AIChat(commands.Cog):
         last_used = self.cooldowns.get(message.author.id, 0.0)
         if now - last_used < self.cooldown_seconds:
             return
+
+        if len(self.cooldowns) > 2000:
+            self.cooldowns = {uid: ts for uid, ts in self.cooldowns.items() if (now - ts) < 60.0}
         self.cooldowns[message.author.id] = now
 
         clean_text = message.content
@@ -1253,11 +1317,11 @@ class AIChat(commands.Cog):
             updates["aiProvider"] = model
         if mode is not None:
             updates["aiMode"] = mode
-            self.memory.pop(inter.channel_id, None)
+            self._clear_channel_memory(inter.channel_id)
         if enabled is not None:
             updates["aiEnabled"] = enabled
         if reset_memory:
-            self.memory.pop(inter.channel_id, None)
+            self._clear_channel_memory(inter.channel_id)
 
         if updates:
             await self.update_ai_config(inter.guild_id, **updates)

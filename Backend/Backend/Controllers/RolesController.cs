@@ -11,11 +11,13 @@ namespace DiscordBot_API.Controllers;
 [Route("api/[controller]")]
 public class RolesController : ControllerBase
 {
+    // Ограничение Discord: максимум 25 кнопок в одном сообщении
     private const int MaxRolesPerCategory = 25;
     private readonly AppDbContext _context;
 
     public RolesController(AppDbContext context) => _context = context;
 
+    // Безопасно обрезает строку до максимальной длины колонки в БД
     private static string TrimToMax(string? value, int maxLength)
     {
         var trimmed = (value ?? string.Empty).Trim();
@@ -50,20 +52,23 @@ public class RolesController : ControllerBase
         var emoji = TrimToMax(request.Emoji, 64);
         var name = TrimToMax(request.Name, 100);
 
-        var role = await _context.Reactions
-            .FirstOrDefaultAsync(r => r.GuildId == request.GuildId && r.RoleId == request.RoleId);
+        // Оптимизация: одним запросом получаем только нужные роли сервера (саму роль или роли из этой категории)
+        var relevantRoles = await _context.Reactions
+            .Where(r => r.GuildId == request.GuildId &&
+                        (r.RoleId == request.RoleId || EF.Functions.ILike(r.Category, category)))
+            .ToListAsync();
 
-        var countInCategory = await _context.Reactions.CountAsync(r =>
-            r.GuildId == request.GuildId
-            && r.RoleId != request.RoleId
-            && EF.Functions.ILike(r.Category, category));
+        var existingRole = relevantRoles.FirstOrDefault(r => r.RoleId == request.RoleId);
+        var otherRolesInCategoryCount = relevantRoles.Count(r =>
+            r.RoleId != request.RoleId &&
+            string.Equals(r.Category, category, StringComparison.OrdinalIgnoreCase));
 
-        if (countInCategory >= MaxRolesPerCategory)
+        if (otherRolesInCategoryCount >= MaxRolesPerCategory)
             return BadRequest(new { message = $"Превышен лимит ролей в категории «{category}» (максимум {MaxRolesPerCategory})." });
 
-        if (role == null)
+        if (existingRole == null)
         {
-            role = new ReactionRole
+            existingRole = new ReactionRole
             {
                 GuildId = request.GuildId,
                 RoleId = request.RoleId,
@@ -71,17 +76,17 @@ public class RolesController : ControllerBase
                 Emoji = emoji,
                 Name = name
             };
-            _context.Reactions.Add(role);
+            _context.Reactions.Add(existingRole);
         }
         else
         {
-            role.Category = category;
-            role.Emoji = emoji;
-            role.Name = name;
+            existingRole.Category = category;
+            existingRole.Emoji = emoji;
+            existingRole.Name = name;
         }
 
         await _context.SaveChangesAsync();
-        return Ok(role);
+        return Ok(existingRole);
     }
 
     [HttpDelete("{guildId}/{roleId}")]

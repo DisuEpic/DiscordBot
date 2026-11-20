@@ -240,7 +240,7 @@ class Utility(commands.Cog):
             if stats.get("enabled") else "⚪ Отключена (`/stats setup`)"
         )
 
-        categories_set = set(r.get("category") or "Общие" for r in guild_roles)
+        categories_set = {r.get("category") or "Общие" for r in guild_roles}
         roles_info = f"Всего: **{len(guild_roles)}** шт. в категориях: {', '.join(f'`{c}`' for c in categories_set)}" if guild_roles else "⚪ Роли не добавлены"
 
         embed = disnake.Embed(
@@ -308,8 +308,10 @@ class Utility(commands.Cog):
     @commands.slash_command(contexts=GUILD_ONLY, name="server_info", description="Информация о сервере")
     async def server_info(self, inter: disnake.ApplicationCommandInteraction):
         guild = inter.guild
-        humans = len([m for m in guild.members if not m.bot])
-        bots = len([m for m in guild.members if m.bot])
+        # Однопроходный подсчёт без создания промежуточных списков в памяти
+        bots = sum(1 for m in guild.members if m.bot)
+        total = guild.member_count or len(guild.members)
+        humans = max(0, total - bots)
         created_at = guild.created_at.strftime("%d.%m.%Y")
 
         embed = disnake.Embed(title=f"📊 Информация о сервере: {guild.name}", color=BRAND_COLOR)
@@ -318,7 +320,7 @@ class Utility(commands.Cog):
 
         embed.add_field(name="👑 Владелец", value=f"<@{guild.owner_id}>", inline=True)
         embed.add_field(name="📅 Создан", value=created_at, inline=True)
-        embed.add_field(name="👥 Участники", value=f"Всего: **{guild.member_count}**\n(Людей: {humans} | Ботов: {bots})", inline=True)
+        embed.add_field(name="👥 Участники", value=f"Всего: **{total}**\n(Людей: {humans} | Ботов: {bots})", inline=True)
         embed.add_field(name="💬 Каналы", value=f"Текст: {len(guild.text_channels)} | Голос: {len(guild.voice_channels)}", inline=True)
         embed.add_field(name="🎭 Роли", value=f"Всего: **{len(guild.roles)}**", inline=True)
         embed.add_field(name="🛡️ Защита", value=str(guild.verification_level).capitalize(), inline=True)

@@ -3,7 +3,7 @@ import disnake
 from disnake.ext import commands, tasks
 from typing import Optional, Dict, Any, Set
 from api import api
-from config import GUILD_ONLY, BRAND_COLOR, TACTICAL_GREEN, ACCENT_GOLD, UNIFIED_FOOTER, log
+from config import GUILD_ONLY, BRAND_COLOR, TACTICAL_GREEN, UNIFIED_FOOTER, log
 
 
 STAT_LABELS = {
@@ -47,14 +47,32 @@ class Stats(commands.Cog):
         self.update_stats_loop.cancel()
 
     @staticmethod
-    def _compute_metrics(guild: disnake.Guild) -> Dict[str, int]:
+    def _compute_metrics(guild: disnake.Guild, include_statuses: bool = False) -> Dict[str, int]:
+        """Считает все метрики сервера за один проход по списку участников и каналов."""
         all_members = guild.member_count or len(guild.members)
-        bots = sum(1 for m in guild.members if m.bot)
+        bots = 0
+        online = 0
+        idle = 0
+        dnd = 0
+
+        for m in guild.members:
+            if m.bot:
+                bots += 1
+            elif include_statuses:
+                st = m.status
+                if st == disnake.Status.online:
+                    online += 1
+                elif st == disnake.Status.idle:
+                    idle += 1
+                elif st == disnake.Status.dnd:
+                    dnd += 1
+
         members = max(0, all_members - bots)
         channels = sum(1 for c in guild.channels if not isinstance(c, disnake.CategoryChannel))
         roles = max(0, len(guild.roles) - 1)  # без @everyone
-        voice = sum(len([m for m in vc.members if not m.bot]) for vc in guild.voice_channels)
-        return {
+        voice = sum(sum(1 for m in vc.members if not m.bot) for vc in guild.voice_channels)
+
+        metrics = {
             "all_members": all_members,
             "members": members,
             "bots": bots,
@@ -62,6 +80,12 @@ class Stats(commands.Cog):
             "roles": roles,
             "voice": voice,
         }
+        if include_statuses:
+            metrics["online"] = online
+            metrics["idle"] = idle
+            metrics["dnd"] = dnd
+            metrics["offline"] = max(0, members - (online + idle + dnd))
+        return metrics
 
     @staticmethod
     def _format_name(style: str, key: str, value: int) -> str:
@@ -112,12 +136,12 @@ class Stats(commands.Cog):
                     await self._sync_guild_stats(guild, stats_cfg)
             except Exception:
                 log.exception("Ошибка обновления статистики для сервера %s", guild.id)
+            await asyncio.sleep(0)
 
     @update_stats_loop.before_loop
     async def before_update_stats_loop(self):
         await self.bot.wait_until_ready()
         await asyncio.sleep(5)
-
 
     @commands.slash_command(
         contexts=GUILD_ONLY,
@@ -155,7 +179,6 @@ class Stats(commands.Cog):
         cfg = await api.get_guild_config(guild_id) or {}
         existing_stats = cfg.get("stats") or {}
 
-        # 1. Находим или создаём категорию
         target_cat = category
         if not target_cat and existing_stats.get("categoryId") and str(existing_stats["categoryId"]).isdigit():
             maybe_cat = guild.get_channel(int(existing_stats["categoryId"]))
@@ -209,7 +232,6 @@ class Stats(commands.Cog):
             existing_ch = guild.get_channel(int(existing_id)) if (existing_id and str(existing_id).isdigit()) else None
 
             if not enabled_flag:
-                # Если админ отключил конкретный счётчик при повторной настройке — удаляем старый канал
                 if isinstance(existing_ch, disnake.VoiceChannel):
                     self.ignored_audit_ids.add(existing_ch.id)
                     try:
@@ -362,12 +384,7 @@ class Stats(commands.Cog):
     async def server_stats(self, inter: disnake.ApplicationCommandInteraction):
         await inter.response.defer()
         guild = inter.guild
-        m = self._compute_metrics(guild)
-
-        online = sum(1 for u in guild.members if not u.bot and u.status == disnake.Status.online)
-        idle = sum(1 for u in guild.members if not u.bot and u.status == disnake.Status.idle)
-        dnd = sum(1 for u in guild.members if not u.bot and u.status == disnake.Status.dnd)
-        offline = max(0, m["members"] - (online + idle + dnd))
+        m = self._compute_metrics(guild, include_statuses=True)
 
         embed = disnake.Embed(
             title=f"📊 Статистика сервера: {guild.name}",
@@ -384,7 +401,7 @@ class Stats(commands.Cog):
         )
         embed.add_field(
             name="📡 Онлайн-активность",
-            value=f"🟢 В сети: **{online}** | 🌙 Отошёл: **{idle}**\n⛔ Не бесп.: **{dnd}** | ⚫ Оффлайн: **{offline}**",
+            value=f"🟢 В сети: **{m['online']}** | 🌙 Отошёл: **{m['idle']}**\n⛔ Не бесп.: **{m['dnd']}** | ⚫ Оффлайн: **{m['offline']}**",
             inline=True
         )
         embed.add_field(

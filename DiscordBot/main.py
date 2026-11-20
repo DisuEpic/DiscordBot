@@ -1,6 +1,13 @@
 import os
 import logging
 import asyncio
+
+try:
+    import uvloop
+    uvloop.install()
+except ImportError:
+    pass
+
 import disnake
 from disnake.ext import commands, tasks
 from config import BOT_TOKEN, log
@@ -44,6 +51,7 @@ async def rotate_presence():
         name=f"{count_str} {_plural_servers(count)} | /help"
     )
     await bot.change_presence(activity=activity)
+
 
 @rotate_presence.before_loop
 async def before_rotate_presence():

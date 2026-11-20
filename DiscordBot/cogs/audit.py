@@ -1,7 +1,7 @@
 import time
 import disnake
 from disnake.ext import commands
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Tuple
 from collections import deque
 from api import api
 from utils import send_log, send_welcome_card
@@ -9,6 +9,10 @@ from config import (
     ACCENT_GOLD, COMBAT_RED, TACTICAL_GREEN, BRAND_COLOR, UNIFIED_FOOTER,
     RAID_WINDOW_SECONDS, RAID_JOIN_THRESHOLD, RAID_ALERT_COOLDOWN, YOUNG_ACCOUNT_DAYS
 )
+
+# Защита от лимитов Discord API: минимальный интервал между запросами в Журнал Аудита при удалении сообщений
+AUDIT_DELETE_FETCH_COOLDOWN = 2.5
+_audit_fetch_timestamps: Dict[Tuple[int, str], float] = {}
 
 
 def is_safe_to_restore_role(role: disnake.Role, bot_top_role: disnake.Role | None) -> bool:
@@ -34,11 +38,23 @@ async def fetch_recent_audit_entry(
     guild: disnake.Guild,
     action: disnake.AuditLogAction,
     target_id: Optional[int] = None,
-    max_age_seconds: float = 8.0
+    max_age_seconds: float = 8.0,
+    min_interval_seconds: float = 0.0
 ) -> Optional[disnake.AuditLogEntry]:
-    """Ищет недавнюю запись в Журнале Аудита Discord, чтобы узнать, кто совершил действие."""
+    """Ищет недавнюю запись в Журнале Аудита Discord с защитой от спама запросами."""
     if not guild.me or not guild.me.guild_permissions.view_audit_log:
         return None
+
+    now_mono = time.monotonic()
+    if min_interval_seconds > 0:
+        key = (guild.id, str(action))
+        last_fetch = _audit_fetch_timestamps.get(key, 0.0)
+        if (now_mono - last_fetch) < min_interval_seconds:
+            return None
+        if len(_audit_fetch_timestamps) > 1000:
+            _audit_fetch_timestamps.clear()
+        _audit_fetch_timestamps[key] = now_mono
+
     try:
         now = disnake.utils.utcnow()
         async for entry in guild.audit_logs(limit=5, action=action):
@@ -104,7 +120,10 @@ class Audit(commands.Cog):
 
         deleter_text = ""
         entry = await fetch_recent_audit_entry(
-            message.guild, disnake.AuditLogAction.message_delete, target_id=message.author.id
+            message.guild,
+            disnake.AuditLogAction.message_delete,
+            target_id=message.author.id,
+            min_interval_seconds=AUDIT_DELETE_FETCH_COOLDOWN
         )
         if entry and entry.user and entry.user.id != message.author.id:
             deleter_text = f"\n**Удалил модератор:** {entry.user.mention}"
@@ -277,6 +296,11 @@ class Audit(commands.Cog):
                 self._restoring_members.pop(u_id, None)
 
         if len(joins) >= RAID_JOIN_THRESHOLD and now - self._last_raid_alert.get(member.guild.id, 0) > RAID_ALERT_COOLDOWN:
+            if len(self._last_raid_alert) > 500:
+                self._last_raid_alert = {
+                    gid: ts for gid, ts in self._last_raid_alert.items()
+                    if (now - ts) <= RAID_ALERT_COOLDOWN
+                }
             self._last_raid_alert[member.guild.id] = now
             alert = disnake.Embed(
                 title="🚨 ВОЗМОЖНЫЙ РЕЙД",
@@ -495,6 +519,7 @@ class Audit(commands.Cog):
             ) if stats_cfg.get(k)
         }
         return str(channel_id) in stat_ids
+
     @commands.Cog.listener()
     async def on_guild_channel_create(self, channel: disnake.abc.GuildChannel):
         if await self._is_stats_channel(channel.guild.id, channel.id):

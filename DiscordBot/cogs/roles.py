@@ -1,3 +1,4 @@
+import asyncio
 import disnake
 from disnake.ext import commands
 from typing import Optional, Dict, List, Any
@@ -197,6 +198,8 @@ class Roles(commands.Cog):
             embed.set_footer(text=UNIFIED_FOOTER)
             view = build_role_buttons_view(subset, single_choice=False)
             await inter.channel.send(embed=embed, view=view)
+            # Небольшая пауза между сообщениями защищает от burst rate-limit Discord
+            await asyncio.sleep(0.3)
 
         await inter.edit_original_response(content=f"✅ Опубликовано блоков по категориям: **{len(categories)}** шт.")
 

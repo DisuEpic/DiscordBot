@@ -17,6 +17,7 @@ public class UsersController : ControllerBase
 
     private static UserDto ToDto(User u) => new(u.GuildId, u.DiscordId, u.IsVerified, u.JoinedAt, u.Roles);
 
+    // Находит профиль участника или безопасно создаёт новый при первом обращении
     private async Task<User> EnsureUserExistsAsync(string guildId, string discordId)
     {
         var user = await _context.Users.FirstOrDefaultAsync(u => u.GuildId == guildId && u.DiscordId == discordId);
@@ -48,9 +49,12 @@ public class UsersController : ControllerBase
         if (ValidateIds(request.GuildId, request.DiscordId) is { } error) return error;
 
         var user = await EnsureUserExistsAsync(request.GuildId, request.DiscordId);
-        user.IsVerified = true;
+        if (!user.IsVerified)
+        {
+            user.IsVerified = true;
+            await _context.SaveChangesAsync();
+        }
 
-        await _context.SaveChangesAsync();
         return Ok(new { message = "Пользователь успешно верифицирован", discordId = user.DiscordId });
     }
 
@@ -59,8 +63,14 @@ public class UsersController : ControllerBase
     {
         if (!Snowflake.IsValid(guildId)) return BadRequest(new { message = "Некорректный GuildId." });
 
-        var users = await _context.Users.AsNoTracking().Where(u => u.GuildId == guildId).ToListAsync();
-        return Ok(users.Select(u => ToDto(u)));
+        // Проекция Select сразу в SQL без загрузки лишнего столбца Id (Guid) в память
+        var users = await _context.Users
+            .AsNoTracking()
+            .Where(u => u.GuildId == guildId)
+            .Select(u => new UserDto(u.GuildId, u.DiscordId, u.IsVerified, u.JoinedAt, u.Roles))
+            .ToListAsync();
+
+        return Ok(users);
     }
 
     [HttpGet("{guildId}/{discordId}")]
@@ -68,10 +78,15 @@ public class UsersController : ControllerBase
     {
         if (ValidateIds(guildId, discordId) is { } error) return error;
 
-        var user = await _context.Users.AsNoTracking()
-            .FirstOrDefaultAsync(u => u.GuildId == guildId && u.DiscordId == discordId);
+        var userDto = await _context.Users
+            .AsNoTracking()
+            .Where(u => u.GuildId == guildId && u.DiscordId == discordId)
+            .Select(u => new UserDto(u.GuildId, u.DiscordId, u.IsVerified, u.JoinedAt, u.Roles))
+            .FirstOrDefaultAsync();
 
-        return user == null ? NotFound(new { message = "Пользователь не найден." }) : Ok(ToDto(user));
+        return userDto == null
+            ? NotFound(new { message = "Пользователь не найден." })
+            : Ok(userDto);
     }
 
     [HttpPost("{guildId}/{discordId}/roles")]
@@ -84,19 +99,31 @@ public class UsersController : ControllerBase
         var user = await EnsureUserExistsAsync(guildId, discordId);
 
         var roles = user.Roles.ToList();
+        var changed = false;
+
         if (request.Add)
         {
-            if (!roles.Contains(request.RoleId)) roles.Add(request.RoleId);
+            if (!roles.Contains(request.RoleId))
+            {
+                roles.Add(request.RoleId);
+                changed = true;
+            }
         }
         else
         {
-            roles.Remove(request.RoleId);
+            changed = roles.Remove(request.RoleId);
         }
-        user.Roles = roles;
 
-        await _context.SaveChangesAsync();
+        // Сохраняем в базу только если список ролей действительно изменился
+        if (changed)
+        {
+            user.Roles = roles;
+            await _context.SaveChangesAsync();
+        }
+
         return Ok(new { message = "Роли пользователя обновлены", roles = user.Roles });
     }
+
     [HttpPost("{guildId}/{discordId}/roles/batch")]
     public async Task<IActionResult> BatchUpdateUserRoles(string guildId, string discordId, [FromBody] BatchUpdateRolesRequest request)
     {
@@ -108,30 +135,38 @@ public class UsersController : ControllerBase
         var user = await EnsureUserExistsAsync(guildId, discordId);
 
         var rolesSet = user.Roles.ToHashSet();
-        rolesSet.ExceptWith(toRemove);
-        foreach (var r in toAdd)
-        {
-            rolesSet.Add(r);
-        }
+        var initialCount = rolesSet.Count;
 
-        user.Roles = rolesSet.ToList();
-        await _context.SaveChangesAsync();
+        rolesSet.ExceptWith(toRemove);
+        var afterRemoveCount = rolesSet.Count;
+
+        foreach (var r in toAdd)
+            rolesSet.Add(r);
+
+        // Избегаем лишнего UPDATE в БД, если набор ролей остался прежним
+        if (afterRemoveCount != initialCount || rolesSet.Count != afterRemoveCount)
+        {
+            user.Roles = rolesSet.ToList();
+            await _context.SaveChangesAsync();
+        }
 
         return Ok(new { message = "Роли пользователя пакетно обновлены", roles = user.Roles });
     }
+
     [HttpPost("unverify")]
     public async Task<IActionResult> UnverifyUser([FromBody] VerifyRequest request)
     {
         if (ValidateIds(request.GuildId, request.DiscordId) is { } error)
             return error;
-        var users = await _context.Users.FirstOrDefaultAsync(u => u.GuildId == request.GuildId && u.DiscordId == request.DiscordId);
-        if (users == null)
-        {
+
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.GuildId == request.GuildId && u.DiscordId == request.DiscordId);
+        if (user == null)
             return NotFound(new { message = "Пользователь не найден в базе данных" });
-        }
-        users.IsVerified = false;
-        users.Roles = new List<string>();
+
+        user.IsVerified = false;
+        user.Roles = new List<string>();
         await _context.SaveChangesAsync();
-        return Ok(new { message = " Верификация пользователя аннулирована, профиль сброшен." });
+
+        return Ok(new { message = "Верификация пользователя аннулирована, профиль сброшен." });
     }
 }

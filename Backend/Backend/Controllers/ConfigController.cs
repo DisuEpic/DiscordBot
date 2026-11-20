@@ -4,6 +4,7 @@ using DiscordBot_API.Helpers;
 using DiscordBot_API.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace DiscordBot_API.Controllers;
 
@@ -12,66 +13,82 @@ namespace DiscordBot_API.Controllers;
 public class ConfigController : ControllerBase
 {
     private readonly AppDbContext _context;
+    private readonly IMemoryCache _cache;
 
-    public ConfigController(AppDbContext context) => _context = context;
+    // Настраиваемый параметр: время жизни кэша настроек сервера в оперативной памяти
+    private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(5);
 
+    public ConfigController(AppDbContext context, IMemoryCache cache)
+    {
+        _context = context;
+        _cache = cache;
+    }
+
+    // Формирует единый ключ для хранения настроек конкретного сервера в кэше
+    private static string GetCacheKey(string guildId) => $"guild_config:{guildId}";
+
+    // Очищает пробелы и превращает пустую строку в null
     private static string? NormalizeOptionalText(string? value)
     {
         var trimmed = value?.Trim();
         return string.IsNullOrEmpty(trimmed) ? null : trimmed;
     }
 
+    // Преобразует модель базы данных в объект ответа (DTO) для бота
     private static GuildConfigDto ToDto(GuildCoreConfig c) => new(
-         c.GuildId,
-         c.LogChannelId,
-         c.IsPremium,
-         c.PremiumUntil,
-         new SecurityConfigDto(
-             c.Security?.VerificationRoleId,
-             c.Security?.TrapChannelId,
-             c.Security?.UseCaptcha ?? true,
-             c.Security?.AutoKickUnverified ?? false,
-             c.Security?.VerifyTimeoutMinutes ?? 10
-         ),
-         new WelcomeConfigDto(
-             c.Welcome?.ChannelId,
-             c.Welcome?.Title,
-             c.Welcome?.Description
-         ),
-         new VoiceConfigDto(
-             c.Voice?.GeneratorChannelId,
-             c.Voice?.RoomTemplate
-         ),
-         new AiConfigDto(
-             c.Ai?.Enabled ?? true,
-             c.Ai?.Mode ?? "standard",
-             c.Ai?.Provider ?? "auto",
-             c.Ai?.CustomScenario,
-             c.Ai?.CustomRules
-         ),
-         new StatsConfigDto(
-             c.Stats?.Enabled ?? false,
-             c.Stats?.Style ?? "en",
-             c.Stats?.CategoryId,
-             c.Stats?.AllMembersChannelId,
-             c.Stats?.MembersChannelId,
-             c.Stats?.BotsChannelId,
-             c.Stats?.ChannelsChannelId,
-             c.Stats?.RolesChannelId,
-             c.Stats?.VoiceChannelId
-         )
+        c.GuildId,
+        c.LogChannelId,
+        c.IsPremium,
+        c.PremiumUntil,
+        new SecurityConfigDto(
+            c.Security?.VerificationRoleId,
+            c.Security?.TrapChannelId,
+            c.Security?.UseCaptcha ?? true,
+            c.Security?.AutoKickUnverified ?? false,
+            c.Security?.VerifyTimeoutMinutes ?? 10
+        ),
+        new WelcomeConfigDto(
+            c.Welcome?.ChannelId,
+            c.Welcome?.Title,
+            c.Welcome?.Description
+        ),
+        new VoiceConfigDto(
+            c.Voice?.GeneratorChannelId,
+            c.Voice?.RoomTemplate
+        ),
+        new AiConfigDto(
+            c.Ai?.Enabled ?? true,
+            c.Ai?.Mode ?? "standard",
+            c.Ai?.Provider ?? "auto",
+            c.Ai?.CustomScenario,
+            c.Ai?.CustomRules
+        ),
+        new StatsConfigDto(
+            c.Stats?.Enabled ?? false,
+            c.Stats?.Style ?? "en",
+            c.Stats?.CategoryId,
+            c.Stats?.AllMembersChannelId,
+            c.Stats?.MembersChannelId,
+            c.Stats?.BotsChannelId,
+            c.Stats?.ChannelsChannelId,
+            c.Stats?.RolesChannelId,
+            c.Stats?.VoiceChannelId
+        )
     );
 
-    private async Task<GuildCoreConfig> EnsureCoreConfigExistsAsync(string guildId)
-    {
-        var core = await _context.GuildCoreConfigs
-            .AsSplitQuery()
+    // Загружает полную конфигурацию сервера одним SQL-запросом (без дробления на 6 запросов)
+    private IQueryable<GuildCoreConfig> QueryFullConfig() =>
+        _context.GuildCoreConfigs
             .Include(c => c.Security)
             .Include(c => c.Welcome)
             .Include(c => c.Voice)
             .Include(c => c.Ai)
-            .Include(c => c.Stats)
-            .FirstOrDefaultAsync(c => c.GuildId == guildId);
+            .Include(c => c.Stats);
+
+    // Гарантирует, что запись сервера и все 5 его подмодулей существуют в базе данных
+    private async Task<GuildCoreConfig> EnsureCoreConfigExistsAsync(string guildId)
+    {
+        var core = await QueryFullConfig().FirstOrDefaultAsync(c => c.GuildId == guildId);
 
         if (core != null)
         {
@@ -106,15 +123,18 @@ public class ConfigController : ControllerBase
         }
         catch (DbUpdateException)
         {
+            // Если параллельный запрос успел создать запись на миллисекунду раньше — очищаем трекер и читаем готовую запись со всеми Include
             _context.ChangeTracker.Clear();
-            return await _context.GuildCoreConfigs
-                .AsSplitQuery()
-                .Include(c => c.Security)
-                .Include(c => c.Welcome)
-                .Include(c => c.Voice)
-                .Include(c => c.Ai)
-                .FirstAsync(c => c.GuildId == guildId);
+            return await QueryFullConfig().FirstAsync(c => c.GuildId == guildId);
         }
+    }
+
+    // Сохраняет свежий DTO в кэш и возвращает ответ 200 OK
+    private OkObjectResult SaveCacheAndReturnOk(GuildCoreConfig core)
+    {
+        var dto = ToDto(core);
+        _cache.Set(GetCacheKey(core.GuildId), dto, CacheDuration);
+        return Ok(dto);
     }
 
     [HttpGet("{guildId}")]
@@ -123,20 +143,24 @@ public class ConfigController : ControllerBase
         if (!Snowflake.IsValid(guildId))
             return BadRequest(new { message = "Некорректный GuildId." });
 
-        var config = await _context.GuildCoreConfigs
+        var cacheKey = GetCacheKey(guildId);
+
+        // 1. Сначала проверяем быстрый кэш в оперативной памяти
+        if (_cache.TryGetValue(cacheKey, out GuildConfigDto? cachedDto) && cachedDto != null)
+            return Ok(cachedDto);
+
+        // 2. Если в кэше нет — делаем 1 быстрый запрос без отслеживания изменений (AsNoTracking)
+        var config = await QueryFullConfig()
             .AsNoTracking()
-            .AsSplitQuery()
-            .Include(c => c.Security)
-            .Include(c => c.Welcome)
-            .Include(c => c.Voice)
-            .Include(c => c.Ai)
-            .Include(c => c.Stats)
             .FirstOrDefaultAsync(c => c.GuildId == guildId);
 
         if (config == null)
             return NotFound(new { message = "Настройки для указанного сервера не найдены." });
 
-        return Ok(ToDto(config));
+        var dto = ToDto(config);
+        _cache.Set(cacheKey, dto, CacheDuration);
+
+        return Ok(dto);
     }
 
     [HttpPut("{guildId}/general")]
@@ -152,7 +176,7 @@ public class ConfigController : ControllerBase
         core.LogChannelId = logId;
 
         await _context.SaveChangesAsync();
-        return Ok(ToDto(core));
+        return SaveCacheAndReturnOk(core);
     }
 
     [HttpPut("{guildId}/security")]
@@ -175,7 +199,7 @@ public class ConfigController : ControllerBase
         sec.VerifyTimeoutMinutes = Math.Clamp(request.VerifyTimeoutMinutes ?? 10, 1, 1440);
 
         await _context.SaveChangesAsync();
-        return Ok(ToDto(core));
+        return SaveCacheAndReturnOk(core);
     }
 
     [HttpPut("{guildId}/welcome")]
@@ -195,7 +219,7 @@ public class ConfigController : ControllerBase
         welcome.Description = NormalizeOptionalText(request.Description);
 
         await _context.SaveChangesAsync();
-        return Ok(ToDto(core));
+        return SaveCacheAndReturnOk(core);
     }
 
     [HttpPut("{guildId}/voice")]
@@ -215,7 +239,7 @@ public class ConfigController : ControllerBase
         voice.RoomTemplate = tpl != null && tpl.Length > 64 ? tpl[..64] : tpl;
 
         await _context.SaveChangesAsync();
-        return Ok(ToDto(core));
+        return SaveCacheAndReturnOk(core);
     }
 
     [HttpPut("{guildId}/ai")]
@@ -242,8 +266,9 @@ public class ConfigController : ControllerBase
         ai.CustomRules = NormalizeOptionalText(request.CustomRules);
 
         await _context.SaveChangesAsync();
-        return Ok(ToDto(core));
+        return SaveCacheAndReturnOk(core);
     }
+
     [HttpPut("{guildId}/stats")]
     public async Task<IActionResult> UpdateStats(string guildId, [FromBody] UpdateStatsConfigRequest request)
     {
@@ -279,7 +304,7 @@ public class ConfigController : ControllerBase
         stats.VoiceChannelId = voiceId;
 
         await _context.SaveChangesAsync();
-        return Ok(ToDto(core));
+        return SaveCacheAndReturnOk(core);
     }
 
     [HttpPost("{guildId}/reset")]
@@ -310,6 +335,7 @@ public class ConfigController : ControllerBase
         core.Ai.Provider = "auto";
         core.Ai.CustomScenario = null;
         core.Ai.CustomRules = null;
+
         core.Stats!.Enabled = false;
         core.Stats.Style = "en";
         core.Stats.CategoryId = null;
@@ -321,6 +347,6 @@ public class ConfigController : ControllerBase
         core.Stats.VoiceChannelId = null;
 
         await _context.SaveChangesAsync();
-        return Ok(ToDto(core));
+        return SaveCacheAndReturnOk(core);
     }
 }

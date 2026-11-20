@@ -7,13 +7,14 @@ from config import API_BASE_URL, API_KEY, log
 
 class BackendClient:
     CACHE_TTL = 120
+    MAX_CACHE_ENTRIES = 3000
 
     def __init__(self, base_url: str, api_key: str = ""):
         self.base_url = str(base_url).rstrip("/")
         self.api_key = api_key
         self._session: Optional[aiohttp.ClientSession] = None
 
-        self._config_cache: Dict[str, Any] = {}
+        self._config_cache: Dict[str, Optional[Dict[str, Any]]] = {}
         self._config_cache_time: Dict[str, float] = {}
         self._roles_cache: Dict[str, List[Dict[str, Any]]] = {}
         self._roles_cache_time: Dict[str, float] = {}
@@ -21,7 +22,9 @@ class BackendClient:
     async def get_session(self) -> aiohttp.ClientSession:
         if self._session is None or self._session.closed:
             headers = {"X-Api-Key": self.api_key} if self.api_key else {}
+            connector = aiohttp.TCPConnector(limit=100, ttl_dns_cache=300)
             self._session = aiohttp.ClientSession(
+                connector=connector,
                 timeout=aiohttp.ClientTimeout(total=4),
                 headers=headers,
             )
@@ -30,6 +33,21 @@ class BackendClient:
     async def close(self):
         if self._session and not self._session.closed:
             await self._session.close()
+
+    def _prune_cache(self, data_dict: Dict[str, Any], time_dict: Dict[str, float]):
+        if len(data_dict) <= self.MAX_CACHE_ENTRIES:
+            return
+        now = time.time()
+        expired = [k for k, ts in time_dict.items() if (now - ts) >= self.CACHE_TTL]
+        for k in expired:
+            data_dict.pop(k, None)
+            time_dict.pop(k, None)
+        # Если всё ещё больше лимита — удаляем самые старые 20%
+        if len(data_dict) > self.MAX_CACHE_ENTRIES:
+            oldest = sorted(time_dict.items(), key=lambda item: item[1])[: len(data_dict) // 5]
+            for k, _ in oldest:
+                data_dict.pop(k, None)
+                time_dict.pop(k, None)
 
     async def _request(self, method: str, path: str, **kwargs) -> Tuple[Optional[int], Any]:
         url = f"{self.base_url}{path}"
@@ -78,11 +96,13 @@ class BackendClient:
     # --- МОДУЛЬНЫЕ НАСТРОЙКИ СЕРВЕРА ---
 
     def _update_cache(self, guild_id: str, data: Any):
+        self._prune_cache(self._config_cache, self._config_cache_time)
         if isinstance(data, dict):
             self._config_cache[guild_id] = data
             self._config_cache_time[guild_id] = time.time()
         else:
             self._config_cache.pop(guild_id, None)
+            self._config_cache_time.pop(guild_id, None)
 
     async def get_guild_config(self, guild_id: str) -> Optional[Dict[str, Any]]:
         now = time.time()
@@ -91,10 +111,19 @@ class BackendClient:
 
         status, data = await self._request("GET", f"/config/{guild_id}")
         if status == 200 and isinstance(data, dict):
+            self._prune_cache(self._config_cache, self._config_cache_time)
             self._config_cache[guild_id] = data
             self._config_cache_time[guild_id] = now
             return data
-        return self._config_cache.get(guild_id) if status is None else None
+
+        if status == 404:
+            # Негативное кэширование: пустые/ненастроенные серверы не бьют в БД на каждое сообщение
+            self._prune_cache(self._config_cache, self._config_cache_time)
+            self._config_cache[guild_id] = None
+            self._config_cache_time[guild_id] = now
+            return None
+
+        return self._config_cache.get(guild_id)
 
     async def update_general_config(self, guild_id: str, log_channel_id: Optional[str]) -> bool:
         status, data = await self._request(
@@ -132,6 +161,7 @@ class BackendClient:
             self._update_cache(guild_id, data)
             return True
         return False
+
     async def update_stats_config(self, guild_id: str, payload: Dict[str, Any]) -> bool:
         status, data = await self._request("PUT", f"/config/{guild_id}/stats", json=payload)
         if status == 200:
@@ -155,6 +185,7 @@ class BackendClient:
 
         status, data = await self._request("GET", f"/roles?guildId={guild_id}")
         if status == 200 and isinstance(data, list):
+            self._prune_cache(self._roles_cache, self._roles_cache_time)
             self._roles_cache[guild_id] = data
             self._roles_cache_time[guild_id] = now
             return data
@@ -165,6 +196,7 @@ class BackendClient:
         status, _ = await self._request("POST", "/roles", json=payload)
         if status == 200:
             self._roles_cache.pop(guild_id, None)
+            self._roles_cache_time.pop(guild_id, None)
             return True
         return False
 
@@ -172,6 +204,7 @@ class BackendClient:
         status, _ = await self._request("DELETE", f"/roles/{guild_id}/{role_id}")
         if status == 200:
             self._roles_cache.pop(guild_id, None)
+            self._roles_cache_time.pop(guild_id, None)
             return True
         return False
 
@@ -179,8 +212,9 @@ class BackendClient:
         status, _ = await self._request("DELETE", f"/roles/category/{guild_id}/{quote(category, safe='')}")
         if status == 200:
             self._roles_cache.pop(guild_id, None)
+            self._roles_cache_time.pop(guild_id, None)
             return True
         return False
-    
+
 
 api = BackendClient(API_BASE_URL, API_KEY)

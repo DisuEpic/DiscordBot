@@ -1,5 +1,8 @@
+import asyncio
+import time
 import disnake
-from typing import Optional, List, Dict, Any
+from collections import deque
+from typing import Optional, List, Dict, Any, Tuple
 from api import api
 from config import TACTICAL_GREEN, UNIFIED_FOOTER
 
@@ -8,6 +11,116 @@ DEFAULT_WELCOME_DESC = (
     "Приветствуем, {user}!\n"
     "Рады видеть тебя на нашем сервере!"
 )
+
+# Настраиваемые лимиты очереди логов и кэша вебхуков
+MAX_LOG_BUFFER_PER_GUILD = 100
+MAX_WEBHOOK_CACHE_ENTRIES = 1000
+_WEBHOOK_CACHE_TTL = 600.0
+
+# Очередь батчинга логов: guild_id -> deque[(TextChannel, Embed)]
+_log_buffers: Dict[int, deque] = {}
+_log_flush_tasks: Dict[int, asyncio.Task] = {}
+# Кэш вебхуков: channel_id -> (timestamp, Webhook | None)
+_webhook_cache: Dict[int, Tuple[float, Optional[disnake.Webhook]]] = {}
+
+
+def _prune_webhook_cache(now: float):
+    """Удаляет устаревшие записи из кэша вебхуков, чтобы не тратить лишнюю ОЗУ."""
+    if len(_webhook_cache) <= MAX_WEBHOOK_CACHE_ENTRIES:
+        return
+    expired = [cid for cid, (ts, _) in _webhook_cache.items() if (now - ts) >= _WEBHOOK_CACHE_TTL]
+    for cid in expired:
+        _webhook_cache.pop(cid, None)
+
+    if len(_webhook_cache) > MAX_WEBHOOK_CACHE_ENTRIES:
+        oldest = sorted(_webhook_cache.items(), key=lambda item: item[1][0])[: len(_webhook_cache) // 5]
+        for cid, _ in oldest:
+            _webhook_cache.pop(cid, None)
+
+
+async def _get_or_create_log_webhook(channel: disnake.TextChannel) -> Optional[disnake.Webhook]:
+    now = time.time()
+    cached = _webhook_cache.get(channel.id)
+    if cached and (now - cached[0]) < _WEBHOOK_CACHE_TTL:
+        return cached[1]
+
+    _prune_webhook_cache(now)
+
+    me = channel.guild.me
+    if not me or not channel.permissions_for(me).manage_webhooks:
+        _webhook_cache[channel.id] = (now, None)
+        return None
+
+    try:
+        webhooks = await channel.webhooks()
+        for wh in webhooks:
+            if wh.user and me and wh.user.id == me.id and wh.name == "Mirei Logs":
+                _webhook_cache[channel.id] = (now, wh)
+                return wh
+
+        if len(webhooks) < 15:
+            wh = await channel.create_webhook(name="Mirei Logs", reason="Оптимизированное логирование Mirei")
+            _webhook_cache[channel.id] = (now, wh)
+            return wh
+    except disnake.HTTPException:
+        pass
+
+    _webhook_cache[channel.id] = (now, None)
+    return None
+
+
+async def _send_embed_batch(channel: disnake.TextChannel, embeds: List[disnake.Embed]):
+    if not embeds:
+        return
+
+    webhook = await _get_or_create_log_webhook(channel)
+    if webhook is not None:
+        try:
+            me = channel.guild.me
+            await webhook.send(
+                embeds=embeds,
+                username="Mirei • Аудит",
+                avatar_url=me.display_avatar.url if me else None,
+            )
+            return
+        except disnake.NotFound:
+            _webhook_cache.pop(channel.id, None)
+        except disnake.HTTPException:
+            pass
+
+    try:
+        await channel.send(embeds=embeds)
+    except disnake.HTTPException:
+        pass
+
+
+async def _flush_guild_logs(guild_id: int):
+    try:
+        await asyncio.sleep(1.2)
+        buf = _log_buffers.get(guild_id)
+        while buf:
+            first_channel, first_embed = buf.popleft()
+            batch: List[disnake.Embed] = [first_embed]
+            total_chars = len(first_embed)
+
+            while buf and len(batch) < 10:
+                next_channel, next_embed = buf[0]
+                if next_channel.id != first_channel.id:
+                    break
+                next_len = len(next_embed)
+                if total_chars + next_len > 5500:
+                    break
+                buf.popleft()
+                batch.append(next_embed)
+                total_chars += next_len
+
+            await _send_embed_batch(first_channel, batch)
+            if buf:
+                await asyncio.sleep(0.5)
+    finally:
+        _log_flush_tasks.pop(guild_id, None)
+        if guild_id in _log_buffers and len(_log_buffers[guild_id]) == 0:
+            _log_buffers.pop(guild_id, None)
 
 
 async def send_log(guild: disnake.Guild, embed: disnake.Embed):
@@ -19,11 +132,15 @@ async def send_log(guild: disnake.Guild, embed: disnake.Embed):
     except (ValueError, TypeError):
         return
     log_channel = guild.get_channel(log_channel_id)
-    if log_channel and isinstance(log_channel, disnake.TextChannel):
-        try:
-            await log_channel.send(embed=embed)
-        except disnake.Forbidden:
-            pass
+    if not log_channel or not isinstance(log_channel, disnake.TextChannel):
+        return
+
+    buf = _log_buffers.setdefault(guild.id, deque(maxlen=MAX_LOG_BUFFER_PER_GUILD))
+    buf.append((log_channel, embed))
+
+    task = _log_flush_tasks.get(guild.id)
+    if task is None or task.done():
+        _log_flush_tasks[guild.id] = asyncio.create_task(_flush_guild_logs(guild.id))
 
 
 async def send_welcome_card(

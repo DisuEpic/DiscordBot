@@ -278,18 +278,23 @@ class Verification(commands.Cog):
     @tasks.loop(minutes=1.0)
     async def check_unverified_members(self):
         now = disnake.utils.utcnow()
-        for guild in self.bot.guilds:
+        window_minutes = VERIFY_WINDOW_HOURS * 60
+
+        for guild in list(self.bot.guilds):
             cfg = await api.get_guild_config(str(guild.id))
             sec = (cfg or {}).get("security") or {}
             if not sec.get("autoKickUnverified", False):
+                await asyncio.sleep(0)
                 continue
 
             verify_role_id = sec.get("verificationRoleId")
             if not verify_role_id or not str(verify_role_id).isdigit():
+                await asyncio.sleep(0)
                 continue
 
             verify_role = guild.get_role(int(verify_role_id))
             if not verify_role:
+                await asyncio.sleep(0)
                 continue
 
             timeout_mins = sec.get("verifyTimeoutMinutes") or VERIFY_TIMEOUT_MINUTES
@@ -301,7 +306,7 @@ class Verification(commands.Cog):
                     continue
 
                 minutes_on_server = (now - member.joined_at).total_seconds() / 60
-                if minutes_on_server > VERIFY_WINDOW_HOURS * 60:
+                if minutes_on_server > window_minutes:
                     continue
 
                 waiting_since = max(member.joined_at, self.started_at)
@@ -341,6 +346,7 @@ class Verification(commands.Cog):
                         pass
                     except disnake.HTTPException:
                         log.exception("Не удалось кикнуть неверифицированного участника %s", member.id)
+            await asyncio.sleep(0)
 
     @check_unverified_members.before_loop
     async def before_check_unverified(self):
