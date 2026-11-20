@@ -139,8 +139,8 @@ class SettingsDashboardView(disnake.ui.View):
         elif choice == "aiReset":
             ok = await api.update_ai_config(guild_id, {
                 "enabled": True,
-                "mode": "standard",
                 "provider": "auto",
+                "autoReplyChance": 0,
                 "customScenario": None,
                 "customRules": None,
             })

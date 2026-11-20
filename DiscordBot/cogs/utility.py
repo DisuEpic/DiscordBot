@@ -231,8 +231,9 @@ class Utility(commands.Cog):
             if sec.get("autoKickUnverified") else "⚪ Отключен"
         )
         captcha_str = "🛡️ Включена" if sec.get("useCaptcha", True) else "⚡ В 1 клик"
+        ai_chance = int(ai.get("autoReplyChance") or 0)
         ai_str = (
-            f"🟢 Вкл | Модель: `{ai.get('provider', 'auto')}` | Режим: `{ai.get('mode', 'standard')}`"
+            f"🟢 Вкл | Модель: `{ai.get('provider', 'auto')}` | Авто-чат: `{ai_chance}%`"
             if ai.get("enabled", True) else "🔴 Отключен"
         )
         stats_str = (

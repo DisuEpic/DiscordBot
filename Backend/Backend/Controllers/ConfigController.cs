@@ -15,7 +15,7 @@ public class ConfigController : ControllerBase
     private readonly AppDbContext _context;
     private readonly IMemoryCache _cache;
 
-    // Настраиваемый параметр: время жизни кэша настроек сервера в оперативной памяти
+    // Настраиваемый параметр: время жизни кэша настроек в ОЗУ
     private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(5);
 
     public ConfigController(AppDbContext context, IMemoryCache cache)
@@ -24,17 +24,14 @@ public class ConfigController : ControllerBase
         _cache = cache;
     }
 
-    // Формирует единый ключ для хранения настроек конкретного сервера в кэше
     private static string GetCacheKey(string guildId) => $"guild_config:{guildId}";
 
-    // Очищает пробелы и превращает пустую строку в null
     private static string? NormalizeOptionalText(string? value)
     {
         var trimmed = value?.Trim();
         return string.IsNullOrEmpty(trimmed) ? null : trimmed;
     }
 
-    // Преобразует модель базы данных в объект ответа (DTO) для бота
     private static GuildConfigDto ToDto(GuildCoreConfig c) => new(
         c.GuildId,
         c.LogChannelId,
@@ -58,8 +55,8 @@ public class ConfigController : ControllerBase
         ),
         new AiConfigDto(
             c.Ai?.Enabled ?? true,
-            c.Ai?.Mode ?? "standard",
             c.Ai?.Provider ?? "auto",
+            c.Ai?.AutoReplyChance ?? 0,
             c.Ai?.CustomScenario,
             c.Ai?.CustomRules
         ),
@@ -76,7 +73,6 @@ public class ConfigController : ControllerBase
         )
     );
 
-    // Загружает полную конфигурацию сервера одним SQL-запросом (без дробления на 6 запросов)
     private IQueryable<GuildCoreConfig> QueryFullConfig() =>
         _context.GuildCoreConfigs
             .Include(c => c.Security)
@@ -85,7 +81,6 @@ public class ConfigController : ControllerBase
             .Include(c => c.Ai)
             .Include(c => c.Stats);
 
-    // Гарантирует, что запись сервера и все 5 его подмодулей существуют в базе данных
     private async Task<GuildCoreConfig> EnsureCoreConfigExistsAsync(string guildId)
     {
         var core = await QueryFullConfig().FirstOrDefaultAsync(c => c.GuildId == guildId);
@@ -123,13 +118,11 @@ public class ConfigController : ControllerBase
         }
         catch (DbUpdateException)
         {
-            // Если параллельный запрос успел создать запись на миллисекунду раньше — очищаем трекер и читаем готовую запись со всеми Include
             _context.ChangeTracker.Clear();
             return await QueryFullConfig().FirstAsync(c => c.GuildId == guildId);
         }
     }
 
-    // Сохраняет свежий DTO в кэш и возвращает ответ 200 OK
     private OkObjectResult SaveCacheAndReturnOk(GuildCoreConfig core)
     {
         var dto = ToDto(core);
@@ -144,12 +137,9 @@ public class ConfigController : ControllerBase
             return BadRequest(new { message = "Некорректный GuildId." });
 
         var cacheKey = GetCacheKey(guildId);
-
-        // 1. Сначала проверяем быстрый кэш в оперативной памяти
         if (_cache.TryGetValue(cacheKey, out GuildConfigDto? cachedDto) && cachedDto != null)
             return Ok(cachedDto);
 
-        // 2. Если в кэше нет — делаем 1 быстрый запрос без отслеживания изменений (AsNoTracking)
         var config = await QueryFullConfig()
             .AsNoTracking()
             .FirstOrDefaultAsync(c => c.GuildId == guildId);
@@ -251,17 +241,13 @@ public class ConfigController : ControllerBase
         var core = await EnsureCoreConfigExistsAsync(guildId);
         var ai = core.Ai!;
 
-        var mode = NormalizeOptionalText(request.Mode)?.ToLowerInvariant() ?? "standard";
-        if (mode is not ("standard" or "overdrive"))
-            mode = "standard";
-
         var provider = NormalizeOptionalText(request.Provider)?.ToLowerInvariant() ?? "auto";
         if (provider.Length > 32)
             provider = provider[..32];
 
         ai.Enabled = request.Enabled ?? true;
-        ai.Mode = mode;
         ai.Provider = provider;
+        ai.AutoReplyChance = Math.Clamp(request.AutoReplyChance ?? 0, 0, 100);
         ai.CustomScenario = NormalizeOptionalText(request.CustomScenario);
         ai.CustomRules = NormalizeOptionalText(request.CustomRules);
 
@@ -331,8 +317,8 @@ public class ConfigController : ControllerBase
         core.Voice.RoomTemplate = null;
 
         core.Ai!.Enabled = true;
-        core.Ai.Mode = "standard";
         core.Ai.Provider = "auto";
+        core.Ai.AutoReplyChance = 0;
         core.Ai.CustomScenario = null;
         core.Ai.CustomRules = null;
 

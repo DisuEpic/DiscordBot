@@ -27,8 +27,8 @@ public record UpdateVoiceConfigRequest(
 
 public record UpdateAiConfigRequest(
     bool? Enabled = true,
-    string? Mode = "standard",
     string? Provider = "auto",
+    int? AutoReplyChance = 0,
     string? CustomScenario = null,
     string? CustomRules = null);
 
@@ -52,8 +52,8 @@ public record VoiceConfigDto(
 
 public record AiConfigDto(
     bool Enabled,
-    string Mode,
     string Provider,
+    int AutoReplyChance,
     string? CustomScenario,
     string? CustomRules);
 public record UpdateStatsConfigRequest(

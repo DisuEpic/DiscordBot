@@ -59,6 +59,7 @@ public class GuildAiConfig
     public bool Enabled { get; set; } = true;
     public string Mode { get; set; } = "standard";
     public string Provider { get; set; } = "auto";
+    public int AutoReplyChance { get; set; } = 0;
     public string? CustomScenario { get; set; }
     public string? CustomRules { get; set; }
 }

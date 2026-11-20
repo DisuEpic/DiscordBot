@@ -29,6 +29,9 @@ namespace DiscordBot_API.Migrations
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)");
 
+                    b.Property<int>("AutoReplyChance")
+                        .HasColumnType("integer");
+
                     b.Property<string>("CustomRules")
                         .HasColumnType("text");
 
