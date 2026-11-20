@@ -2,6 +2,7 @@ import os
 import logging
 import asyncio
 
+# Подключаем быстрый движок циклов событий uvloop на Linux/macOS
 try:
     import uvloop
     uvloop.install()
@@ -14,8 +15,10 @@ from config import BOT_TOKEN, log
 from api import api
 from views import VerifyView
 
+# Настраиваемый параметр: уровень логирования сетевого шлюза Discord (WARNING скрывает лишний шум)
 logging.getLogger("disnake.gateway").setLevel(logging.WARNING)
 
+# Настройка прав (Intents) бота на получение событий от Discord
 intents = disnake.Intents.default()
 intents.members = True
 intents.message_content = True
@@ -24,14 +27,20 @@ intents.voice_states = True
 
 class MireiBot(commands.AutoShardedInteractionBot):
     async def close(self):
+        # Корректно закрываем HTTP-сессию с C# API при остановке бота
         await api.close()
         await super().close()
 
 
-bot = MireiBot(intents=intents)
+# Явно создаём и назначаем цикл событий для Python 3.12+ до инициализации бота
+loop = asyncio.new_event_loop()
+asyncio.set_event_loop(loop)
+
+bot = MireiBot(intents=intents, loop=loop)
 
 
 def _plural_servers(n: int) -> str:
+    """Склоняет слово 'сервер' в зависимости от числа."""
     if 11 <= (n % 100) <= 19:
         return "серверов"
     last = n % 10
@@ -42,6 +51,7 @@ def _plural_servers(n: int) -> str:
     return "серверов"
 
 
+# Настраиваемый параметр: интервал обновления статуса бота в Discord (в минутах)
 @tasks.loop(minutes=5)
 async def rotate_presence():
     count = len(bot.guilds)
@@ -60,6 +70,7 @@ async def before_rotate_presence():
 
 @bot.event
 async def on_ready():
+    # Регистрируем постоянные кнопки верификации, чтобы они работали после перезапуска
     bot.add_view(VerifyView(use_captcha=False))
     bot.add_view(VerifyView(use_captcha=True))
     if not rotate_presence.is_running():
@@ -96,6 +107,7 @@ async def on_slash_command_error(inter: disnake.ApplicationCommandInteraction, e
         pass
 
 
+# Автоматическая загрузка всех модулей (когов) из папки cogs/
 cogs_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cogs")
 for filename in os.listdir(cogs_dir):
     if filename.endswith(".py") and not filename.startswith("__"):
