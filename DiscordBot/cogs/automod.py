@@ -296,8 +296,9 @@ class AutoModeration(commands.Cog):
 
         reason = f"Mirei AutoMod: настройка от {inter.author.id}"
         saved = False
-
         try:
+            rule_filter = Filter(rule_filter)
+            scope = Scope(scope) if scope is not None else None
             requested_scope = parse_scope(guild, scope, channels)
             if enabled and requested_scope is not None:
                 exempt_channel_ids(guild, requested_scope)
