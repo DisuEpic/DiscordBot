@@ -35,7 +35,9 @@ class Moderation(commands.Cog):
         guild_config = await api.get_guild_config(str(inter.guild_id)) or {}
         role_id = (guild_config.get("security") or {}).get("verificationRoleId")
         target_role = (
-            inter.guild.get_role(int(role_id)) if role_id else None
+            inter.guild.get_role(int(role_id))
+            if role_id and str(role_id).isdigit()
+            else None
         ) or inter.guild.default_role
 
         try:
@@ -187,7 +189,7 @@ class Moderation(commands.Cog):
             embed = disnake.Embed(
                 title="🔇 Применён таймаут",
                 description=(
-                    f"**Нарушитель:** {member.mention} (\`{member.id}\`)\n"
+                    f"**Нарушитель:** {member.mention} (`{member.id}`)\n"
                     f"**Модератор:** {inter.author.mention}\n"
                     f"**Время:** {minutes} мин.\n"
                     f"**Причина:** {reason}"
@@ -230,7 +232,7 @@ class Moderation(commands.Cog):
             embed = disnake.Embed(
                 title="👢 Участник исключён",
                 description=(
-                    f"**Исключён:** {member.mention} (\`{member.id}\`)\n"
+                    f"**Исключён:** {member.mention} (`{member.id}`)\n"
                     f"**Модератор:** {inter.author.mention}\n"
                     f"**Причина:** {reason}"
                 ),
@@ -275,7 +277,7 @@ class Moderation(commands.Cog):
             embed = disnake.Embed(
                 title="🔨 Участник заблокирован",
                 description=(
-                    f"**Заблокирован:** {member.mention} (\`{member.id}\`)\n"
+                    f"**Заблокирован:** {member.mention} (`{member.id}`)\n"
                     f"**Модератор:** {inter.author.mention}\n"
                     f"**Причина:** {reason}"
                 ),
@@ -317,12 +319,12 @@ class Moderation(commands.Cog):
                 user, reason=f"{reason} (Модератор: {inter.author})"
             )
             await inter.edit_original_response(
-                content=f"🔓 Пользователь **{user.name}** (\`{user.id}\`) разблокирован."
+                content=f"🔓 Пользователь **{user.name}** (`{user.id}`) разблокирован."
             )
             embed = disnake.Embed(
                 title="🔓 Пользователь разблокирован",
                 description=(
-                    f"**Пользователь:** {user.mention} (\`{user.id}\`)\n"
+                    f"**Пользователь:** {user.mention} (`{user.id}`)\n"
                     f"**Модератор:** {inter.author.mention}\n"
                     f"**Причина:** {reason}"
                 ),

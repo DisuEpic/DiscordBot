@@ -12,10 +12,7 @@ from config import (
     GUILD_ONLY, VERIFY_TIMEOUT_MINUTES, VERIFY_WINDOW_HOURS,
     CAPTCHA_ACCOUNT_DAYS, TACTICAL_GREEN, COMBAT_RED, UNIFIED_FOOTER, log,
 )
-from utils import (
-    send_log, send_welcome_card, check_moderation_target,
-    DEFAULT_WELCOME_TITLE, DEFAULT_WELCOME_DESC,
-)
+from utils import send_log, send_welcome_card, check_moderation_target
 from views import VerifyView
 
 
@@ -270,79 +267,6 @@ class Verification(commands.Cog):
         embed.set_thumbnail(url=member.display_avatar.url)
         embed.set_footer(text=UNIFIED_FOOTER)
         await send_log(inter.guild, embed)
-
-    @commands.slash_command(
-        contexts=GUILD_ONLY,
-        name="set_welcome",
-        description="Настроить текст карточки приветствия в базе данных",
-    )
-    @commands.default_member_permissions(administrator=True)
-    async def set_welcome(
-        self,
-        inter: disnake.ApplicationCommandInteraction,
-        title: Optional[str] = commands.Param(
-            default=None, description="Заголовок (доступно: {user}, {server})"
-        ),
-        description: Optional[str] = commands.Param(
-            default=None, description="Текст описания (доступно: {user}, {server})"
-        ),
-        reset_to_default: bool = commands.Param(
-            default=False, description="Сбросить к тексту по умолчанию?"
-        ),
-    ):
-        await inter.response.defer(ephemeral=True)
-        guild_id = str(inter.guild_id)
-        cfg = await api.get_guild_config(guild_id) or {}
-        welcome = dict(cfg.get("welcome") or {})
-
-        if reset_to_default:
-            welcome["title"] = None
-            welcome["description"] = None
-            if await api.update_welcome_config(guild_id, welcome):
-                message = "♻️ Приветствие сброшено к стандартному тексту."
-            else:
-                message = "❌ Ошибка сохранения в БД."
-            await inter.edit_original_response(content=message)
-            return
-
-        if not title and not description:
-            await inter.edit_original_response(
-                content="⚠️ Укажите новый заголовок или описание либо выберите сброс."
-            )
-            return
-
-        if title:
-            welcome["title"] = title
-        if description:
-            welcome["description"] = description
-
-        if not await api.update_welcome_config(guild_id, welcome):
-            await inter.edit_original_response(
-                content="❌ Не удалось сохранить шаблон приветствия в базу данных."
-            )
-            return
-
-        sample_title = (
-            (welcome.get("title") or DEFAULT_WELCOME_TITLE)
-            .replace("{user}", inter.author.display_name)
-            .replace("{server}", inter.guild.name)
-        )
-        sample_description = (
-            (welcome.get("description") or DEFAULT_WELCOME_DESC)
-            .replace("{user}", inter.author.mention)
-            .replace("{server}", inter.guild.name)
-        )
-        preview = disnake.Embed(
-            title=f"Предпросмотр: {sample_title}",
-            description=sample_description,
-            color=TACTICAL_GREEN,
-        )
-        preview.set_thumbnail(url=inter.author.display_avatar.url)
-        preview.set_footer(text=UNIFIED_FOOTER)
-        await inter.edit_original_response(
-            content="✅ Шаблон приветствия сохранён. Предпросмотр:",
-            embed=preview,
-        )
 
     @tasks.loop(minutes=1.0)
     async def check_unverified_members(self):

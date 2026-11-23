@@ -21,6 +21,7 @@ logging.getLogger("disnake.gateway").setLevel(logging.WARNING)
 # Настройка прав (Intents) бота на получение событий от Discord
 intents = disnake.Intents.default()
 intents.members = True
+intents.presences = True
 intents.message_content = True
 intents.voice_states = True
 
