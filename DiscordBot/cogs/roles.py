@@ -1,89 +1,166 @@
 import asyncio
+from typing import Any, Dict, List, Optional
+
 import disnake
 from disnake.ext import commands
-from typing import Optional, Dict, List, Any
+
 from api import api
+from cogs.audit import is_safe_to_restore_role
+from config import BRAND_COLOR, GUILD_ONLY, UNIFIED_FOOTER
 from utils import add_chunked_role_fields, check_role_target
 from views import build_role_buttons_view
-from config import GUILD_ONLY, BRAND_COLOR, UNIFIED_FOOTER
+
 
 MAX_ROLES_PER_CATEGORY = 25
+SAFE_MENTIONS = disnake.AllowedMentions.none()
 
 
 class Roles(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
+    @staticmethod
+    async def _finish(inter: disnake.ApplicationCommandInteraction):
+        try:
+            await inter.delete_original_response()
+        except disnake.NotFound:
+            pass
+
+    @staticmethod
+    async def _error(inter: disnake.ApplicationCommandInteraction, message: str):
+        await inter.edit_original_response(
+            content=message, allowed_mentions=SAFE_MENTIONS
+        )
+
     @commands.Cog.listener("on_button_click")
     async def on_role_button(self, inter: disnake.MessageInteraction):
-        custom_id = inter.component.custom_id
+        custom_id = inter.component.custom_id or ""
         if not custom_id.startswith(("toggle_role_", "radio_role_")):
             return
-
-        await inter.response.defer()
-        is_radio = custom_id.startswith("radio_role_")
-        role_id_str = custom_id.replace("radio_role_", "").replace("toggle_role_", "")
-        if not role_id_str.isdigit():
+        if inter.guild is None or not isinstance(inter.author, disnake.Member):
             return
 
-        role = inter.guild.get_role(int(role_id_str))
-        if not role:
-            await inter.followup.send("⚠️ Данная роль больше не существует на сервере.", ephemeral=True)
+        await inter.response.defer(with_message=False)
+
+        role_id = custom_id.rsplit("_", 1)[-1]
+        role = inter.guild.get_role(int(role_id)) if role_id.isdecimal() else None
+        if role is None:
+            await inter.followup.send(
+                "⚠️ Данная роль больше не существует на сервере.",
+                ephemeral=True,
+                allowed_mentions=SAFE_MENTIONS,
+            )
+            return
+
+        catalog = await api.get_roles(str(inter.guild.id), fresh=True)
+        allowed_ids = {str(item.get("roleId")) for item in catalog}
+        bot_top_role = inter.guild.me.top_role if inter.guild.me else None
+
+        if role_id not in allowed_ids or not is_safe_to_restore_role(role, bot_top_role):
+            await inter.followup.send(
+                "⚠️ Эта роль больше недоступна для выбора.",
+                ephemeral=True,
+                allowed_mentions=SAFE_MENTIONS,
+            )
             return
 
         member = inter.author
         try:
             if role in member.roles:
                 await member.remove_roles(role, reason="Снятие роли по кнопке")
-            else:
-                if is_radio and inter.message and inter.message.components:
-                    panel_role_ids = set()
-                    for row in inter.message.components:
-                        for comp in row.children:
-                            cid = getattr(comp, "custom_id", "") or ""
-                            if cid.startswith("radio_role_"):
-                                rid = cid.replace("radio_role_", "")
-                                if rid.isdigit() and rid != role_id_str:
-                                    panel_role_ids.add(int(rid))
+                return
 
-                    roles_to_remove = [r for r in member.roles if r.id in panel_role_ids]
-                    if roles_to_remove:
-                        await member.remove_roles(*roles_to_remove, reason="Смена одиночной роли в панели")
+            if custom_id.startswith("radio_role_") and inter.message:
+                panel_role_ids = set()
+                for row in inter.message.components:
+                    for component in row.children:
+                        component_id = getattr(component, "custom_id", "") or ""
+                        if component_id.startswith("radio_role_"):
+                            panel_role_ids.add(component_id.rsplit("_", 1)[-1])
 
-                await member.add_roles(role, reason="Получение роли по кнопке")
+                roles_to_remove = [
+                    old_role
+                    for old_role in member.roles
+                    if old_role.id != role.id
+                    and str(old_role.id) in panel_role_ids
+                    and str(old_role.id) in allowed_ids
+                    and is_safe_to_restore_role(old_role, bot_top_role)
+                ]
+                if roles_to_remove:
+                    await member.remove_roles(
+                        *roles_to_remove, reason="Смена одиночной роли в панели"
+                    )
+
+            await member.add_roles(role, reason="Получение роли по кнопке")
+
         except disnake.Forbidden:
             await inter.followup.send(
                 "⚠️ Ошибка прав: роль бота должна находиться выше этой роли в настройках сервера.",
-                ephemeral=True
+                ephemeral=True,
+                allowed_mentions=SAFE_MENTIONS,
+            )
+        except disnake.HTTPException:
+            await inter.followup.send(
+                "❌ Discord не подтвердил изменение роли.",
+                ephemeral=True,
+                allowed_mentions=SAFE_MENTIONS,
             )
 
-    @commands.slash_command(contexts=GUILD_ONLY, name="give_role", description="Выдать роль участнику (для модераторов)")
+    @commands.slash_command(
+        contexts=GUILD_ONLY,
+        name="give_role",
+        description="Выдать роль участнику (для модераторов)",
+    )
     @commands.default_member_permissions(manage_roles=True)
-    async def give_role_cmd(self, inter: disnake.ApplicationCommandInteraction, member: disnake.Member, role: disnake.Role):
+    async def give_role_cmd(
+        self,
+        inter: disnake.ApplicationCommandInteraction,
+        member: disnake.Member,
+        role: disnake.Role,
+    ):
         await inter.response.defer(ephemeral=True)
         if error_msg := check_role_target(inter, member, role):
-            await inter.edit_original_response(content=error_msg)
+            await self._error(inter, error_msg)
             return
+
         try:
             await member.add_roles(role, reason=f"Выдано модератором {inter.author}")
-            await inter.edit_original_response(content=f"✅ Роль {role.mention} успешно выдана участнику {member.mention}.")
         except disnake.Forbidden:
-            await inter.edit_original_response(content="⚠️ Роль бота должна стоять выше выдаваемой роли.")
+            await self._error(inter, "⚠️ Роль бота должна стоять выше выдаваемой роли.")
+            return
 
-    @commands.slash_command(contexts=GUILD_ONLY, name="take_role", description="Снять роль с участника (для модераторов)")
+        await self._finish(inter)
+
+    @commands.slash_command(
+        contexts=GUILD_ONLY,
+        name="take_role",
+        description="Снять роль с участника (для модераторов)",
+    )
     @commands.default_member_permissions(manage_roles=True)
-    async def take_role_cmd(self, inter: disnake.ApplicationCommandInteraction, member: disnake.Member, role: disnake.Role):
+    async def take_role_cmd(
+        self,
+        inter: disnake.ApplicationCommandInteraction,
+        member: disnake.Member,
+        role: disnake.Role,
+    ):
         await inter.response.defer(ephemeral=True)
         if error_msg := check_role_target(inter, member, role):
-            await inter.edit_original_response(content=error_msg)
+            await self._error(inter, error_msg)
             return
+
         try:
             await member.remove_roles(role, reason=f"Снято модератором {inter.author}")
-            await inter.edit_original_response(content=f"✅ Роль {role.mention} успешно снята с участника {member.mention}.")
         except disnake.Forbidden:
-            await inter.edit_original_response(content="⚠️ Роль бота должна стоять выше снимаемой роли.")
+            await self._error(inter, "⚠️ Роль бота должна стоять выше снимаемой роли.")
+            return
 
-    @commands.slash_command(contexts=GUILD_ONLY, name="add_role", description="Добавить роль в базу данных с категорией")
+        await self._finish(inter)
+
+    @commands.slash_command(
+        contexts=GUILD_ONLY,
+        name="add_role",
+        description="Добавить роль в базу данных с категорией",
+    )
     @commands.default_member_permissions(administrator=True)
     async def add_role(
         self,
@@ -91,51 +168,79 @@ class Roles(commands.Cog):
         role: disnake.Role,
         category: str = commands.Param(description="Например: Игры, Уведомления, Пол, Цвета"),
         emoji: str = commands.Param(description="Смайлик для кнопки (например: 🎮)"),
-        custom_name: Optional[str] = commands.Param(default=None, description="Свое название")
+        custom_name: Optional[str] = commands.Param(default=None, description="Свое название"),
     ):
         await inter.response.defer(ephemeral=True)
         guild_id = str(inter.guild_id)
-        clean_category = category.strip() or "Общие"
 
+        bot_top_role = inter.guild.me.top_role if inter.guild.me else None
+        if not is_safe_to_restore_role(role, bot_top_role):
+            await self._error(inter, "Эта роль не подходит для самостоятельной выдачи.")
+            return
+
+        clean_category = category.strip() or "Общие"
         existing_roles = await api.get_roles(guild_id)
         category_roles = [
             r for r in existing_roles
             if (r.get("category") or "Общие").lower() == clean_category.lower()
             and str(r.get("roleId")) != str(role.id)
         ]
+
         if len(category_roles) >= MAX_ROLES_PER_CATEGORY:
-            await inter.edit_original_response(
-                content=f"⚠️ В категории **«{clean_category}»** уже достигнут лимит в **{MAX_ROLES_PER_CATEGORY}** ролей."
+            await self._error(
+                inter,
+                f"⚠️ В категории **«{clean_category}»** уже достигнут лимит "
+                f"в **{MAX_ROLES_PER_CATEGORY}** ролей.",
             )
             return
 
         name = custom_name if custom_name else role.name
-        if await api.add_role(guild_id=guild_id, category=clean_category, emoji=emoji, role_id=str(role.id), name=name):
-            await inter.edit_original_response(
-                content=f"✅ Роль {role.mention} сохранена в категорию **«{clean_category}»** под именем **{name}**!"
-            )
+        if await api.add_role(
+            guild_id=guild_id,
+            category=clean_category,
+            emoji=emoji,
+            role_id=str(role.id),
+            name=name,
+        ):
+            await self._finish(inter)
         else:
-            await inter.edit_original_response(content="❌ Ошибка при сохранении роли в API.")
+            await self._error(inter, "❌ Ошибка при сохранении роли в API.")
 
-    @commands.slash_command(contexts=GUILD_ONLY, name="delete_role", description="Удалить роль из базы данных")
+    @commands.slash_command(
+        contexts=GUILD_ONLY,
+        name="delete_role",
+        description="Удалить роль из базы данных",
+    )
     @commands.default_member_permissions(administrator=True)
-    async def delete_role(self, inter: disnake.ApplicationCommandInteraction, role: disnake.Role):
+    async def delete_role(
+        self, inter: disnake.ApplicationCommandInteraction, role: disnake.Role
+    ):
         await inter.response.defer(ephemeral=True)
         if await api.delete_role(str(inter.guild_id), str(role.id)):
-            await inter.edit_original_response(content=f"🗑️ Роль {role.mention} успешно удалена из базы данных.")
+            await self._finish(inter)
         else:
-            await inter.edit_original_response(content="❌ Роль не найдена в базе данных.")
+            await self._error(inter, "❌ Роль не найдена в базе данных.")
 
-    @commands.slash_command(contexts=GUILD_ONLY, name="clear_category_roles", description="Удалить ВСЕ роли категории из базы")
+    @commands.slash_command(
+        contexts=GUILD_ONLY,
+        name="clear_category_roles",
+        description="Удалить ВСЕ роли категории из базы",
+    )
     @commands.default_member_permissions(administrator=True)
-    async def clear_category_roles(self, inter: disnake.ApplicationCommandInteraction, category: str):
+    async def clear_category_roles(
+        self, inter: disnake.ApplicationCommandInteraction, category: str
+    ):
         await inter.response.defer(ephemeral=True)
         if await api.delete_category_roles(str(inter.guild_id), category):
-            await inter.edit_original_response(content=f"🗑️ Все роли в категории **«{category}»** успешно удалены из базы данных.")
+            await self._finish(inter)
         else:
-            await inter.edit_original_response(content=f"❌ В категории **«{category}»** не найдено ролей.")
+            await self._error(inter, f"❌ В категории **«{category}»** не найдено ролей.")
 
-    @commands.slash_command(contexts=GUILD_ONLY, name="send_category_panel", description="Отправить блок выбора ролей одной категории")
+    @commands.slash_command(
+        contexts=GUILD_ONLY,
+        name="send_category_panel",
+        description="Отправить блок выбора ролей одной категории",
+    )
     @commands.default_member_permissions(administrator=True)
     async def send_category_panel(
         self,
@@ -143,7 +248,10 @@ class Roles(commands.Cog):
         category: str = commands.Param(description="Какую категорию отправить"),
         title: Optional[str] = commands.Param(default=None, description="Заголовок"),
         description: Optional[str] = commands.Param(default=None, description="Описание"),
-        single_choice: bool = commands.Param(default=False, description="Разрешить выбрать только ОДНУ роль из этого блока? (например, Пол или Цвет)")
+        single_choice: bool = commands.Param(
+            default=False,
+            description="Разрешить выбрать только ОДНУ роль из этого блока? (например, Пол или Цвет)",
+        ),
     ):
         await inter.response.defer(ephemeral=True)
         all_roles = await api.get_roles(str(inter.guild_id))
@@ -151,35 +259,43 @@ class Roles(commands.Cog):
         target_roles = [
             r for r in all_roles
             if (r.get("category") or "Общие").lower() == category.lower()
-            and str(r.get("roleId", "")).isdigit() and inter.guild.get_role(int(r["roleId"]))
+            and str(r.get("roleId", "")).isdigit()
+            and inter.guild.get_role(int(r["roleId"]))
         ][:MAX_ROLES_PER_CATEGORY]
 
         if not target_roles:
-            await inter.edit_original_response(content=f"⚠️ В категории **«{category}»** нет добавленных ролей.")
+            await self._error(inter, f"⚠️ В категории **«{category}»** нет добавленных ролей.")
             return
 
         embed = disnake.Embed(
             title=title or f"🎭 Выбор ролей: {category}",
             description=description or "Нажмите на кнопку для получения/снятия роли:",
-            color=BRAND_COLOR
+            color=BRAND_COLOR,
         )
         add_chunked_role_fields(embed, "Доступные роли:", target_roles)
         embed.set_footer(text=UNIFIED_FOOTER)
 
         view = build_role_buttons_view(target_roles, single_choice=single_choice)
-        await inter.channel.send(embed=embed, view=view)
-        mode_text = " (режим: только 1 роль)" if single_choice else " (режим: мульти-выбор)"
-        await inter.edit_original_response(content=f"✅ Блок ролей для категории **«{category}»**{mode_text} успешно опубликован!")
+        await inter.channel.send(embed=embed, view=view, allowed_mentions=SAFE_MENTIONS)
+        await self._finish(inter)
 
-    @commands.slash_command(contexts=GUILD_ONLY, name="send_all_categories", description="Отправить все категории ролей отдельными блоками")
+    @commands.slash_command(
+        contexts=GUILD_ONLY,
+        name="send_all_categories",
+        description="Отправить все категории ролей отдельными блоками",
+    )
     @commands.default_member_permissions(administrator=True)
     async def send_all_categories(self, inter: disnake.ApplicationCommandInteraction):
         await inter.response.defer(ephemeral=True)
         all_roles = await api.get_roles(str(inter.guild_id))
 
-        guild_roles = [r for r in all_roles if str(r.get("roleId", "")).isdigit() and inter.guild.get_role(int(r["roleId"]))]
+        guild_roles = [
+            r for r in all_roles
+            if str(r.get("roleId", "")).isdigit()
+            and inter.guild.get_role(int(r["roleId"]))
+        ]
         if not guild_roles:
-            await inter.edit_original_response(content="⚠️ В базе данных пока нет добавленных ролей.")
+            await self._error(inter, "⚠️ В базе данных пока нет добавленных ролей.")
             return
 
         categories: Dict[str, List[Dict[str, Any]]] = {}
@@ -192,18 +308,24 @@ class Roles(commands.Cog):
             embed = disnake.Embed(
                 title=f"🎭 Выбор ролей: {cat_name}",
                 description="Выберите необходимые роли с помощью кнопок ниже:",
-                color=BRAND_COLOR
+                color=BRAND_COLOR,
             )
             add_chunked_role_fields(embed, "Доступные роли:", subset)
             embed.set_footer(text=UNIFIED_FOOTER)
+
             view = build_role_buttons_view(subset, single_choice=False)
-            await inter.channel.send(embed=embed, view=view)
-            # Небольшая пауза между сообщениями защищает от burst rate-limit Discord
+            await inter.channel.send(
+                embed=embed, view=view, allowed_mentions=SAFE_MENTIONS
+            )
             await asyncio.sleep(0.3)
 
-        await inter.edit_original_response(content=f"✅ Опубликовано блоков по категориям: **{len(categories)}** шт.")
+        await self._finish(inter)
 
-    @commands.slash_command(contexts=GUILD_ONLY, name="edit_category_panel", description="Обновить роли и текст в уже отправленном блоке ролей")
+    @commands.slash_command(
+        contexts=GUILD_ONLY,
+        name="edit_category_panel",
+        description="Обновить роли и текст в уже отправленном блоке ролей",
+    )
     @commands.default_member_permissions(administrator=True)
     async def edit_category_panel(
         self,
@@ -212,28 +334,34 @@ class Roles(commands.Cog):
         category: str = commands.Param(description="Категория ролей из базы для этого блока"),
         title: Optional[str] = commands.Param(default=None, description="Новый заголовок"),
         description: Optional[str] = commands.Param(default=None, description="Новое описание"),
-        single_choice: Optional[bool] = commands.Param(default=None, description="Разрешить выбрать только ОДНУ роль из этого блока?")
+        single_choice: Optional[bool] = commands.Param(
+            default=None,
+            description="Разрешить выбрать только ОДНУ роль из этого блока?",
+        ),
     ):
         await inter.response.defer(ephemeral=True)
         try:
             msg = await inter.channel.fetch_message(int(message_id))
         except Exception:
-            await inter.edit_original_response(content="❌ Сообщение с таким ID не найдено в этом канале.")
+            await self._error(inter, "❌ Сообщение с таким ID не найдено в этом канале.")
             return
 
         if msg.author.id != self.bot.user.id:
-            await inter.edit_original_response(content="❌ Можно редактировать только сообщения, отправленные ботом.")
+            await self._error(
+                inter, "❌ Можно редактировать только сообщения, отправленные ботом."
+            )
             return
 
         all_roles = await api.get_roles(str(inter.guild_id))
         target_roles = [
             r for r in all_roles
             if (r.get("category") or "Общие").lower() == category.lower()
-            and str(r.get("roleId", "")).isdigit() and inter.guild.get_role(int(r["roleId"]))
+            and str(r.get("roleId", "")).isdigit()
+            and inter.guild.get_role(int(r["roleId"]))
         ][:MAX_ROLES_PER_CATEGORY]
 
         if not target_roles:
-            await inter.edit_original_response(content=f"⚠️ В категории **«{category}»** нет актуальных ролей.")
+            await self._error(inter, f"⚠️ В категории **«{category}»** нет актуальных ролей.")
             return
 
         if single_choice is None:
@@ -247,16 +375,21 @@ class Roles(commands.Cog):
 
         old_embed = msg.embeds[0] if msg.embeds else None
         embed_title = title or (old_embed.title if old_embed else f"🎭 Выбор ролей: {category}")
-        embed_desc = description or (old_embed.description if old_embed else "Нажмите на кнопку для выбора:")
+        embed_desc = description or (
+            old_embed.description if old_embed else "Нажмите на кнопку для выбора:"
+        )
 
-        embed = disnake.Embed(title=embed_title, description=embed_desc, color=BRAND_COLOR)
+        embed = disnake.Embed(
+            title=embed_title, description=embed_desc, color=BRAND_COLOR
+        )
         add_chunked_role_fields(embed, "Доступные роли:", target_roles)
         embed.set_footer(text=UNIFIED_FOOTER)
 
         view = build_role_buttons_view(target_roles, single_choice=use_single_choice)
-        await msg.edit(content=None, embed=embed, view=view)
-        mode_text = " (только 1 роль)" if use_single_choice else " (мульти-выбор)"
-        await inter.edit_original_response(content=f"✅ Блок ролей для категории **«{category}»**{mode_text} успешно обновлен!")
+        await msg.edit(
+            content=None, embed=embed, view=view, allowed_mentions=SAFE_MENTIONS
+        )
+        await self._finish(inter)
 
 
 def setup(bot: commands.Bot):
