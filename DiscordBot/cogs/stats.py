@@ -10,7 +10,7 @@ from config import BRAND_COLOR, GUILD_ONLY, TACTICAL_GREEN, UNIFIED_FOOTER, log
 
 STAT_LABELS = {
     "en": {
-        "category": "📊 SERVER STATS 📊",
+        "category": "📊 Server stats 📊",
         "all_members": "All Members: {count}",
         "members": "Members: {count}",
         "bots": "Bots: {count}",
@@ -19,7 +19,7 @@ STAT_LABELS = {
         "voice": "In Voice: {count}",
     },
     "ru": {
-        "category": "📊 СТАТИСТИКА СЕРВЕРА 📊",
+        "category": "📊 Статистика сервера 📊",
         "all_members": "Всего участников: {count}",
         "members": "Участники: {count}",
         "bots": "Боты: {count}",
@@ -155,20 +155,21 @@ class Stats(commands.Cog):
 
     @commands.slash_command(
         contexts=GUILD_ONLY,
-        name="stats",
+        name="статистика",
         description="Управление счётчиками статистики сервера",
     )
-    @commands.default_member_permissions(administrator=True)
     async def stats_group(self, inter: disnake.ApplicationCommandInteraction):
         pass
 
     @stats_group.sub_command(
-        name="setup", description="Создать или обновить каналы счётчиков"
+        name="настроить", description="Создать или обновить каналы счётчиков"
     )
+    @commands.has_guild_permissions(administrator=True)
     async def stats_setup(
         self,
         inter: disnake.ApplicationCommandInteraction,
         style: str = commands.Param(
+            name="стиль",
             default="en",
             choices={
                 "🇬🇧 English (All Members: 218)": "en",
@@ -177,25 +178,27 @@ class Stats(commands.Cog):
             description="Язык подписей каналов",
         ),
         include_all_members: bool = commands.Param(
-            default=True, description="Счётчик всех участников"
+            name="все_участники", default=True, description="Счётчик всех участников"
         ),
         include_members: bool = commands.Param(
-            default=True, description="Счётчик людей без ботов"
+            name="люди", default=True, description="Счётчик людей без ботов"
         ),
         include_bots: bool = commands.Param(
-            default=True, description="Счётчик ботов"
+            name="боты", default=True, description="Счётчик ботов"
         ),
         include_channels: bool = commands.Param(
-            default=True, description="Счётчик каналов"
+            name="каналы", default=True, description="Счётчик каналов"
         ),
         include_roles: bool = commands.Param(
-            default=True, description="Счётчик ролей"
+            name="роли", default=True, description="Счётчик ролей"
         ),
         include_voice: bool = commands.Param(
-            default=False, description="Счётчик участников в голосовых каналах"
+            name="в_голосовых",
+            default=False,
+            description="Счётчик участников в голосовых каналах",
         ),
         category: Optional[disnake.CategoryChannel] = commands.Param(
-            default=None, description="Категория для новых счётчиков"
+            name="категория", default=None, description="Категория для новых счётчиков"
         ),
     ):
         await inter.response.defer(ephemeral=True)
@@ -331,8 +334,9 @@ class Stats(commands.Cog):
         await inter.edit_original_response(embed=embed)
 
     @stats_group.sub_command(
-        name="refresh", description="Обновить счётчики прямо сейчас"
+        name="обновить", description="Обновить счётчики прямо сейчас"
     )
+    @commands.has_guild_permissions(administrator=True)
     @commands.cooldown(1, 300, commands.BucketType.guild)
     async def stats_refresh(self, inter: disnake.ApplicationCommandInteraction):
         await inter.response.defer(ephemeral=True)
@@ -340,7 +344,7 @@ class Stats(commands.Cog):
         stats = config.get("stats") or {}
         if not stats.get("enabled"):
             await inter.edit_original_response(
-                content="⚠️ Статистика отключена или ещё не настроена. Используй `/stats setup`."
+                content="⚠️ Статистика отключена или ещё не настроена. Используй `/статистика настроить`."
             )
             return
 
@@ -348,8 +352,9 @@ class Stats(commands.Cog):
         await inter.edit_original_response(content=f"Обновлено счётчиков: **{updated}**.")
 
     @stats_group.sub_command(
-        name="toggle", description="Включить или приостановить автообновление"
+        name="переключить", description="Включить или приостановить автообновление"
     )
+    @commands.has_guild_permissions(administrator=True)
     async def stats_toggle(self, inter: disnake.ApplicationCommandInteraction):
         await inter.response.defer(ephemeral=True)
         guild_id = str(inter.guild_id)
@@ -361,7 +366,7 @@ class Stats(commands.Cog):
         stats = dict(config.get("stats") or {})
         if not any(stats.get(field) for _, field in STAT_FIELD_MAP):
             await inter.edit_original_response(
-                content="⚠️ Сначала создай счётчики командой `/stats setup`."
+                content="⚠️ Сначала создай счётчики командой `/статистика настроить`."
             )
             return
 
@@ -380,13 +385,16 @@ class Stats(commands.Cog):
         await inter.edit_original_response(content=message)
 
     @stats_group.sub_command(
-        name="remove", description="Отключить статистику и удалить счётчики"
+        name="отключить", description="Отключить статистику и удалить счётчики"
     )
+    @commands.has_guild_permissions(administrator=True)
     async def stats_remove(
         self,
         inter: disnake.ApplicationCommandInteraction,
         delete_channels: bool = commands.Param(
-            default=True, description="Удалить голосовые каналы счётчиков"
+            name="удалить_каналы",
+            default=True,
+            description="Удалить голосовые каналы счётчиков",
         ),
     ):
         await inter.response.defer(ephemeral=True)
@@ -439,11 +447,7 @@ class Stats(commands.Cog):
             content=f"Статистика отключена. Удалено каналов: {deleted}. Ошибок удаления: {failed}."
         )
 
-    @commands.slash_command(
-        contexts=GUILD_ONLY,
-        name="server_stats",
-        description="Показать статистику сервера",
-    )
+    @stats_group.sub_command(name="сервер", description="Показать статистику сервера")
     async def server_stats(self, inter: disnake.ApplicationCommandInteraction):
         await inter.response.defer()
         guild = inter.guild

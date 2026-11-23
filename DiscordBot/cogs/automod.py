@@ -16,7 +16,11 @@ FILTERS = {
     "spam": "Антифлуд и повторы",
     "mentions": "Массовые упоминания",
 }
-SCOPES = ("all", "exclude", "only")
+SCOPE_LABELS = {
+    "all": "Везде",
+    "exclude": "Кроме указанных каналов",
+    "only": "Только в указанном канале",
+}
 INVITE_PATTERN = re.compile(
     r"(?i)(^|[^a-z0-9_.-])(?:www\.)?"
     r"(?:discord\.gg|discord(?:app)?\.com/invite)/[a-z0-9-]+"
@@ -35,7 +39,7 @@ def parse_scope(guild, mode: str | None, channels: str | None) -> dict | None:
     items = (channels or "").replace(",", " ").split()
     if mode is None:
         if items:
-            raise ValueError("Укажи scope вместе с channels.")
+            raise ValueError("Укажи «область» вместе с полем «каналы».")
         return None
 
     ids = []
@@ -49,16 +53,16 @@ def parse_scope(guild, mode: str | None, channels: str | None) -> dict | None:
         if channel is None:
             raise ValueError("Укажи канал, ветку или категорию с этого сервера.")
         if mode == "only" and isinstance(channel, disnake.CategoryChannel):
-            raise ValueError("Для only выбери канал или ветку.")
+            raise ValueError("Для «Только в указанном канале» выбери канал или ветку.")
         if channel_id not in ids:
             ids.append(channel_id)
 
     if mode == "all" and ids:
-        raise ValueError("Для all оставь channels пустым.")
+        raise ValueError("Для «Везде» оставь поле «каналы» пустым.")
     if mode == "exclude" and not 1 <= len(ids) <= 50:
-        raise ValueError("Для exclude укажи от 1 до 50 каналов или категорий.")
+        raise ValueError("Для «Кроме указанных каналов» укажи от 1 до 50 каналов или категорий.")
     if mode == "only" and len(ids) != 1:
-        raise ValueError("Для only укажи ровно один канал или ветку.")
+        raise ValueError("Для «Только в указанном канале» укажи ровно один канал или ветку.")
 
     return {"mode": mode, "channelIds": ids}
 
@@ -91,31 +95,31 @@ class AutoModeration(commands.Cog):
         self.checks = OrderedDict()
 
     @commands.slash_command(
-        contexts=GUILD_ONLY, name="automod", description="Автомодерация Mirei"
+        contexts=GUILD_ONLY, name="автомод", description="Автомодерация Mirei"
     )
     @commands.default_member_permissions(manage_guild=True)
     async def automod(self, inter: disnake.ApplicationCommandInteraction):
         pass
 
-    @automod.sub_command(name="help", description="Фильтры, пороги и настройка каналов")
+    @automod.sub_command(name="помощь", description="Фильтры, пороги и настройка каналов")
     async def help_command(self, inter: disnake.ApplicationCommandInteraction):
         await inter.response.send_message(
             "**Фильтры Mirei**\n"
-            "`invites` — приглашения Discord.\n"
-            f"`spam` — {FLOOD_COUNT}-е сообщение за {FLOOD_WINDOW} секунд "
-            f"или {REPEAT_COUNT}-й подряд повтор текста за {REPEAT_WINDOW} секунд "
-            "от одного человека в одном канале.\n"
-            f"`mentions` — более {MENTION_LIMIT} разных упоминаний пользователей или ролей.\n\n"
-            "**Настройка**\n"
-            "В `/automod set` выбери фильтр, `enabled` и при необходимости `scope`.\n"
-            "`all` — везде, `exclude` — кроме перечисленных, `only` — один канал и его ветки.\n"
-            "Пример: `filter:invites enabled:True scope:exclude`, "
-            "а в `channels` вставь ID канала партнёров.\n"
-            "`/automod status` показывает текущую конфигурацию.",
+            "«Ссылки-приглашения Discord» — ссылки на приглашения.\n"
+            f"«Антифлуд и повторы» — {FLOOD_COUNT}-е сообщение за "
+            f"{FLOOD_WINDOW} секунд или {REPEAT_COUNT}-й одинаковый текст подряд "
+            f"за {REPEAT_WINDOW} секунд от одного человека в одном канале.\n"
+            f"«Массовые упоминания» — больше {MENTION_LIMIT} разных упоминаний.\n\n"
+            "В `/автомод настроить` выбери `фильтр`, `включён` и `область`.\n"
+            "Например, для исключения канала партнёров выбери "
+            "«Ссылки-приглашения Discord» и «Кроме указанных каналов», "
+            "затем вставь ID канала в поле `каналы`.\n"
+            "Область «Только в указанном канале» включает его ветки.\n"
+            "`/автомод статус` показывает текущую конфигурацию.",
             ephemeral=True,
         )
 
-    @automod.sub_command(name="status", description="Показать настройки фильтров")
+    @automod.sub_command(name="статус", description="Показать настройки фильтров")
     async def status(self, inter: disnake.ApplicationCommandInteraction):
         await inter.response.defer(ephemeral=True)
         config = await api.get_guild_config_for_update(str(inter.guild_id))
@@ -136,25 +140,34 @@ class AutoModeration(commands.Cog):
             if len(ids) > 5:
                 channels += f" и ещё {len(ids) - 5}"
             suffix = f" · {channels}" if channels else ""
-            lines.append(f"**{label}** — {enabled} · `{mode}`{suffix}")
+            lines.append(f"**{label}** — {enabled} · {SCOPE_LABELS.get(mode, mode)}{suffix}")
 
         await inter.edit_original_response(
             content="\n".join(lines), allowed_mentions=SAFE_MENTIONS
         )
 
-    @automod.sub_command(name="set", description="Изменить фильтр и список каналов")
+    @automod.sub_command(name="настроить", description="Изменить фильтр и список каналов")
     async def set_filter(
         self,
         inter: disnake.ApplicationCommandInteraction,
         rule_filter: str = commands.Param(
-            name="filter", description="Какой фильтр изменить", choices=list(FILTERS)
+            name="фильтр",
+            description="Какой фильтр изменить",
+            choices={label: key for key, label in FILTERS.items()},
         ),
-        enabled: bool = commands.Param(description="Включить или выключить"),
+        enabled: bool = commands.Param(
+            name="включён", description="Включить или выключить"
+        ),
         scope: str | None = commands.Param(
-            default=None, description="Где работает фильтр", choices=list(SCOPES)
+            default=None,
+            name="область",
+            description="Где работает фильтр",
+            choices={label: key for key, label in SCOPE_LABELS.items()},
         ),
         channels: str | None = commands.Param(
-            default=None, description="ID каналов или упоминания через пробел"
+            default=None,
+            name="каналы",
+            description="ID каналов или упоминания через пробел",
         ),
     ):
         guild = inter.guild
@@ -183,8 +196,12 @@ class AutoModeration(commands.Cog):
 
         current_scope = settings["scopes"].get(rule_filter) or {}
         state = "включён" if enabled else "выключен"
+        mode = current_scope.get("mode", "all")
         await inter.edit_original_response(
-            content=f"Фильтр `{rule_filter}` {state}. Область: `{current_scope.get('mode', 'all')}`."
+            content=(
+                f"Фильтр «{FILTERS[rule_filter]}» {state}. "
+                f"Область: {SCOPE_LABELS.get(mode, mode)}."
+            )
         )
 
     def _spam_reason(self, message: disnake.Message) -> str | None:

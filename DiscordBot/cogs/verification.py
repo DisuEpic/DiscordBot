@@ -102,6 +102,7 @@ class Verification(commands.Cog):
         for role_id in saved_role_ids:
             if not role_id.isdigit():
                 continue
+
             role = inter.guild.get_role(int(role_id))
             if (
                 role
@@ -146,7 +147,9 @@ class Verification(commands.Cog):
             )
 
             roles_mentions = ", ".join(role.mention for role in roles_to_give)
-            captcha_note = "\n**Проверка:** 🛡️ Капча пройдена (новый аккаунт)" if passed_captcha else ""
+            captcha_note = (
+                "\n**Проверка:** 🛡️ Капча пройдена (новый аккаунт)" if passed_captcha else ""
+            )
             embed = disnake.Embed(
                 title="✅ Участник верифицирован",
                 description=(
@@ -183,16 +186,27 @@ class Verification(commands.Cog):
 
     @commands.slash_command(
         contexts=GUILD_ONLY,
-        name="unverify",
+        name="верификация",
+        description="Управление верификацией",
+    )
+    async def verification(self, inter: disnake.ApplicationCommandInteraction):
+        pass
+
+    @verification.sub_command(
+        name="снять",
         description="Снять верификацию и очистить сохранённые роли в БД",
     )
-    @commands.default_member_permissions(moderate_members=True)
+    @commands.has_guild_permissions(moderate_members=True)
     async def unverify_member(
         self,
         inter: disnake.ApplicationCommandInteraction,
-        member: disnake.Member = commands.Param(description="У кого снять верификацию"),
+        member: disnake.Member = commands.Param(
+            name="участник", description="У кого снять верификацию"
+        ),
         reason: str = commands.Param(
-            default="Снятие верификации модератором", description="Причина"
+            name="причина",
+            default="Снятие верификации модератором",
+            description="Причина",
         ),
     ):
         await inter.response.defer(ephemeral=True)
@@ -413,21 +427,24 @@ class Verification(commands.Cog):
     async def before_check_unverified(self):
         await self.bot.wait_until_ready()
 
-    @commands.slash_command(
-        contexts=GUILD_ONLY,
-        name="send_verify_panel",
+    @verification.sub_command(
+        name="отправить_панель",
         description="Отправить панель верификации",
     )
-    @commands.default_member_permissions(administrator=True)
+    @commands.has_guild_permissions(administrator=True)
     async def send_verify_panel(
         self,
         inter: disnake.ApplicationCommandInteraction,
-        title: str = "🛡️ Верификация на сервере",
-        description: Optional[str] = None,
-        button_label: str = "Пройти верификацию",
-        button_emoji: str = "✅",
+        title: str = commands.Param(
+            name="заголовок", default="🛡️ Верификация на сервере"
+        ),
+        description: Optional[str] = commands.Param(name="описание", default=None),
+        button_label: str = commands.Param(
+            name="надпись", default="Пройти верификацию"
+        ),
+        button_emoji: str = commands.Param(name="эмодзи", default="✅"),
         use_captcha: Optional[bool] = commands.Param(
-            default=None, description="Включить капчу для новых аккаунтов?"
+            name="капча", default=None, description="Включить капчу для новых аккаунтов?"
         ),
     ):
         await inter.response.defer(ephemeral=True)
@@ -450,27 +467,39 @@ class Verification(commands.Cog):
             button_label=button_label, button_emoji=button_emoji, use_captcha=use_captcha
         )
         await inter.channel.send(embed=embed, view=view)
-        mode = f"с капчей для аккаунтов младше {CAPTCHA_ACCOUNT_DAYS} дн." if use_captcha else "в 1 клик"
+        mode = (
+            f"с капчей для аккаунтов младше {CAPTCHA_ACCOUNT_DAYS} дн."
+            if use_captcha else "в 1 клик"
+        )
         await inter.edit_original_response(
             content=f"✅ Панель верификации ({mode}) отправлена."
         )
 
-    @commands.slash_command(
-        contexts=GUILD_ONLY,
-        name="edit_verify_panel",
+    @verification.sub_command(
+        name="обновить_панель",
         description="Отредактировать панель верификации",
     )
-    @commands.default_member_permissions(administrator=True)
+    @commands.has_guild_permissions(administrator=True)
     async def edit_verify_panel(
         self,
         inter: disnake.ApplicationCommandInteraction,
-        message_id: str = commands.Param(description="ID сообщения панели в этом канале"),
-        title: Optional[str] = commands.Param(default=None, description="Новый заголовок"),
-        description: Optional[str] = commands.Param(default=None, description="Новый текст описания"),
-        button_label: Optional[str] = commands.Param(default=None, description="Новая надпись на кнопке"),
-        button_emoji: Optional[str] = commands.Param(default=None, description="Новый эмодзи на кнопке"),
+        message_id: str = commands.Param(
+            name="сообщение_id", description="ID сообщения панели в этом канале"
+        ),
+        title: Optional[str] = commands.Param(
+            name="заголовок", default=None, description="Новый заголовок"
+        ),
+        description: Optional[str] = commands.Param(
+            name="описание", default=None, description="Новый текст описания"
+        ),
+        button_label: Optional[str] = commands.Param(
+            name="надпись", default=None, description="Новая надпись на кнопке"
+        ),
+        button_emoji: Optional[str] = commands.Param(
+            name="эмодзи", default=None, description="Новый эмодзи на кнопке"
+        ),
         use_captcha: Optional[bool] = commands.Param(
-            default=None, description="Включить капчу для новых аккаунтов?"
+            name="капча", default=None, description="Включить капчу для новых аккаунтов?"
         ),
     ):
         await inter.response.defer(ephemeral=True)
@@ -501,8 +530,12 @@ class Verification(commands.Cog):
             if message.components and message.components[0].children
             else None
         )
-        new_label = button_label or (old_button.label if old_button and old_button.label else "Пройти верификацию")
-        new_emoji = button_emoji or (str(old_button.emoji) if old_button and old_button.emoji else "✅")
+        new_label = button_label or (
+            old_button.label if old_button and old_button.label else "Пройти верификацию"
+        )
+        new_emoji = button_emoji or (
+            str(old_button.emoji) if old_button and old_button.emoji else "✅"
+        )
         if use_captcha is None:
             use_captcha = getattr(old_button, "custom_id", "") == "persistent_verify_captcha"
 

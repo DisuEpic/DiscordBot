@@ -42,7 +42,7 @@ PROMPT_MODERATION_ADDON = (
     "Никогда не придумывай ID сам — бери только из упоминания (<@ID>) или цитаты! Если ID не указан — попроси тегнуть нарушителя."
 )
 
-# Список моделей Gemini можно переопределить через GEMINI_MODELS в .env.
+# Список моделей Gemini по умолчанию (можно переопределить через GEMINI_MODELS в .env)
 DEFAULT_GEMINI_MODELS = [
     "gemini-3.5-flash-lite",
     "gemini-3.8-flash",
@@ -85,7 +85,7 @@ OPENAI_PROVIDERS: Dict[str, Dict[str, Any]] = {
 PROVIDER_NAMES = {
     "auto": "🔄 Авто-выбор (Все доступные)",
     "gemini": "✨ Google Gemini (Текст + Картинки)",
-    **{key: provider["label"] for key, provider in OPENAI_PROVIDERS.items()},
+    **{k: v["label"] for k, v in OPENAI_PROVIDERS.items()},
 }
 
 CHANCE_LABELS = {
@@ -104,10 +104,7 @@ SAFETY_SETTINGS_MODERATE = [
 ]
 
 ALLOWED_IMAGE_TYPES = {"image/png", "image/jpeg", "image/webp", "image/gif"}
-WEEKDAYS_RU = [
-    "Понедельник", "Вторник", "Среда", "Четверг",
-    "Пятница", "Суббота", "Воскресенье",
-]
+WEEKDAYS_RU = ["Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота", "Воскресенье"]
 
 MEMORY_TTL_SECONDS = 3600
 MAX_MEMORY_CHANNELS = 500
@@ -124,52 +121,30 @@ MAX_OUTPUT_TOKENS = 500
 DM_DAILY_LIMIT = 20
 
 WMO_WEATHER_CODES = {
-    0: "Ясно ☀️",
-    1: "Преимущественно ясно 🌤️",
-    2: "Переменная облачность ⛅",
-    3: "Пасмурно ☁️",
-    45: "Туман 🌫️",
-    48: "Изморозь 🌫️",
-    51: "Легкая морось 🌧️",
-    53: "Морось 🌧️",
-    55: "Сильная морось 🌧️",
-    61: "Небольшой дождь 🌦️",
-    63: "Дождь 🌧️",
-    65: "Сильный ливень ⛈️",
-    71: "Небольшой снег 🌨️",
-    73: "Снег ❄️",
-    75: "Сильный снегопад ❄️",
-    77: "Снежные зерна ❄️",
-    80: "Ливневый дождь 🌦️",
-    81: "Сильный ливень ⛈️",
-    82: "Шквалистый ливень ⛈️",
-    85: "Снегопад 🌨️",
-    86: "Сильная метель ❄️",
-    95: "Гроза ⚡",
-    96: "Гроза с градом ⛈️",
-    99: "Сильная гроза с градом ⛈️",
+    0: "Ясно ☀️", 1: "Преимущественно ясно 🌤️", 2: "Переменная облачность ⛅", 3: "Пасмурно ☁️",
+    45: "Туман 🌫️", 48: "Изморозь 🌫️", 51: "Легкая морось 🌧️", 53: "Морось 🌧️", 55: "Сильная морось 🌧️",
+    61: "Небольшой дождь 🌦️", 63: "Дождь 🌧️", 65: "Сильный ливень ⛈️",
+    71: "Небольшой снег 🌨️", 73: "Снег ❄️", 75: "Сильный снегопад ❄️", 77: "Снежные зерна ❄️",
+    80: "Ливневый дождь 🌦️", 81: "Сильный ливень ⛈️", 82: "Шквалистый ливень ⛈️",
+    85: "Снегопад 🌨️", 86: "Сильная метель ❄️", 95: "Гроза ⚡", 96: "Гроза с градом ⛈️", 99: "Сильная гроза с градом ⛈️"
 }
 
 
 class ConfirmModActionView(disnake.ui.View):
-    def __init__(
-        self, actor_id: int, action: str, target: disnake.Member, reason: str
-    ):
+    """Кнопка подтверждения для действий модерации через ИИ."""
+
+    def __init__(self, actor_id: int, action: str, target: disnake.Member, reason: str):
         super().__init__(timeout=30)
         self.actor_id = actor_id
         self.action = action
         self.target = target
         self.reason = reason
 
-    @disnake.ui.button(
-        label="Подтвердить", style=disnake.ButtonStyle.danger, emoji="⚠️"
-    )
-    async def confirm(
-        self, button: disnake.ui.Button, inter: disnake.MessageInteraction
-    ):
+    @disnake.ui.button(label="Подтвердить", style=disnake.ButtonStyle.danger, emoji="⚠️")
+    async def confirm(self, button: disnake.ui.Button, inter: disnake.MessageInteraction):
         if inter.author.id != self.actor_id:
             await inter.response.send_message(
-                "⛔ Подтвердить действие может только модератор, который его запросил.",
+                "⛔ Подтвердить действие может только тот модератор, который его запросил.",
                 ephemeral=True,
             )
             return
@@ -178,9 +153,7 @@ class ConfirmModActionView(disnake.ui.View):
         permission = "ban_members" if self.action == "ban" else "kick_members"
         target = guild.get_member(self.target.id) if guild else None
         if target is None or not getattr(inter.author.guild_permissions, permission):
-            await inter.response.edit_message(
-                content="Участник или право модерации недоступны.", view=None
-            )
+            await inter.response.edit_message(content="Цель или право модерации недоступны.", view=None)
             return
         if error := check_moderation_target(inter, target):
             await inter.response.edit_message(content=error, view=None)
@@ -189,77 +162,47 @@ class ConfirmModActionView(disnake.ui.View):
         await inter.response.defer()
         try:
             if self.action == "ban":
-                await target.ban(
-                    reason=f"{self.reason} (ИИ-команда от {inter.author})",
-                    clean_history_duration=86400,
-                )
-                title = "🔨 Участник заблокирован через Mirei"
-                text = (
-                    f"🔨 Участник **{target.display_name}** заблокирован на сервере. "
-                    f"*(Причина: {self.reason})*"
-                )
+                await target.ban(reason=f"{self.reason} (ИИ-команда от {inter.author})", clean_history_duration=86400)
+                title = "🔨 Участник заблокирован (через ИИ Mirei)"
+                text = f"🔨 Участник **{self.target.display_name}** заблокирован на сервере. *(Причина: {self.reason})*"
             else:
                 await target.kick(reason=f"{self.reason} (ИИ-команда от {inter.author})")
-                title = "👢 Участник исключён через Mirei"
-                text = (
-                    f"👢 Участник **{target.display_name}** исключён с сервера. "
-                    f"*(Причина: {self.reason})*"
-                )
+                title = "👢 Участник исключен (через ИИ Mirei)"
+                text = f"👢 Участник **{self.target.display_name}** исключен с сервера. *(Причина: {self.reason})*"
 
-            embed = disnake.Embed(
+            log_embed = disnake.Embed(
                 title=title,
-                description=(
-                    f"**Участник:** {target.mention} (`{target.id}`)\n"
-                    f"**Модератор:** {inter.author.mention}\n"
-                    f"**Причина:** {self.reason}"
-                ),
+                description=f"**Участник:** {self.target.mention} (`{self.target.id}`)\n**Модератор:** {inter.author.mention}\n**Причина:** {self.reason}",
                 color=COMBAT_RED,
                 timestamp=disnake.utils.utcnow(),
             )
-            embed.set_footer(text=UNIFIED_FOOTER)
-            await send_log(guild, embed)
-            await inter.edit_original_response(
-                content=text, view=None, allowed_mentions=SAFE_MENTIONS
-            )
+            log_embed.set_footer(text=UNIFIED_FOOTER)
+            await send_log(guild, log_embed)
+            await inter.edit_original_response(content=text, view=None, allowed_mentions=SAFE_MENTIONS)
         except disnake.Forbidden:
             await inter.edit_original_response(
-                content="⚠️ У бота недостаточно прав Discord для этого действия.",
+                content="⚠️ У меня недостаточно прав Discord для выполнения этого действия.",
                 view=None,
             )
-        except disnake.HTTPException as error:
-            await inter.edit_original_response(
-                content=f"❌ Ошибка Discord API: {error}", view=None
-            )
+        except disnake.HTTPException as e:
+            await inter.edit_original_response(content=f"❌ Ошибка Discord API: {e}", view=None)
 
     @disnake.ui.button(label="Отмена", style=disnake.ButtonStyle.secondary, emoji="✖️")
-    async def cancel(
-        self, button: disnake.ui.Button, inter: disnake.MessageInteraction
-    ):
+    async def cancel(self, button: disnake.ui.Button, inter: disnake.MessageInteraction):
         if inter.author.id != self.actor_id:
-            await inter.response.send_message(
-                "⛔ Отменить действие может только автор запроса.", ephemeral=True
-            )
+            await inter.response.send_message("⛔ Отменить может только автор запроса.", ephemeral=True)
             return
-
-        await inter.response.edit_message(
-            content="↩️ Действие модерации отменено.", view=None
-        )
+        await inter.response.edit_message(content="↩️ Действие модерации отменено.", view=None)
 
 
 class AICustomizeModal(disnake.ui.Modal):
-    def __init__(
-        self,
-        cog: "AIChat",
-        panel_view: "AIControlPanelView",
-        current_scenario: str,
-        current_rules: str,
-    ):
+    def __init__(self, cog: "AIChat", panel_view: "AIControlPanelView", current_scenario: str, current_rules: str):
         self.cog = cog
         self.panel_view = panel_view
         components = [
             disnake.ui.TextInput(
-                label="Сценарий и стиль общения",
-                placeholder="Оставьте пустым для стандартного характера Mirei.",
+                label="Индивидуальный сценарий / стиль общения",
+                placeholder="Оставьте пустым для стандартного характера Mirei или напишите свой...",
                 custom_id="ai_custom_scenario",
                 style=disnake.TextInputStyle.paragraph,
                 value=current_scenario[:1000] if current_scenario else "",
@@ -267,8 +210,8 @@ class AICustomizeModal(disnake.ui.Modal):
                 max_length=1000,
             ),
             disnake.ui.TextInput(
-                label="Правила сервера для ИИ",
-                placeholder="Оставьте пустым для чтения из канала правил.",
+                label="Правила сервера для ИИ (пусто = авто-поиск)",
+                placeholder="Оставьте пустым, чтобы Mirei сама читала канал #правила, или впишите свои...",
                 custom_id="ai_custom_rules",
                 style=disnake.TextInputStyle.paragraph,
                 value=current_rules[:1000] if current_rules else "",
@@ -276,7 +219,7 @@ class AICustomizeModal(disnake.ui.Modal):
                 max_length=1000,
             ),
         ]
-        super().__init__(title="💠 Сценарий и правила Mirei", components=components)
+        super().__init__(title="💠 Сценарий и Правила для Mirei", components=components)
 
     async def callback(self, inter: disnake.ModalInteraction):
         await inter.response.defer()
@@ -285,6 +228,7 @@ class AICustomizeModal(disnake.ui.Modal):
 
         guild_id = inter.guild_id
         self.cog.rules_cache.pop(guild_id, None)
+
         saved = await self.cog.update_ai_config(
             guild_id,
             aiCustomScenario=scenario or None,
@@ -293,21 +237,14 @@ class AICustomizeModal(disnake.ui.Modal):
         self.cog._clear_channel_memory(inter.channel_id)
 
         embed = await self.panel_view.build_embed(inter.guild)
-        warning = None if saved else "⚠️ Не удалось сохранить настройки в БД."
-        await inter.edit_original_response(
-            content=warning, embed=embed, view=self.panel_view
-        )
+        warn = None if saved else "⚠️ Не удалось сохранить в БД."
+        await inter.edit_original_response(content=warn, embed=embed, view=self.panel_view)
 
 
 class AIControlPanelView(disnake.ui.View):
-    def __init__(
-        self,
-        cog: "AIChat",
-        author_id: int,
-        guild_id: int,
-        channel_id: int,
-        current_cfg: Dict[str, Any],
-    ):
+    """Панель управления ИИ с доступными провайдерами."""
+
+    def __init__(self, cog: "AIChat", author_id: int, guild_id: int, channel_id: int, current_cfg: Dict[str, Any]):
         super().__init__(timeout=300)
         self.cog = cog
         self.author_id = author_id
@@ -316,101 +253,87 @@ class AIControlPanelView(disnake.ui.View):
 
         provider_options = [
             disnake.SelectOption(
-                label="Авто-выбор",
+                label="Авто-выбор (Все доступные)",
                 value="auto",
                 emoji="🔄",
-                description="Перебор настроенных провайдеров",
+                description="Автоматический перебор настроенных API",
             )
         ]
         if cog.gemini_key:
-            provider_options.append(
-                disnake.SelectOption(
-                    label="Google Gemini",
-                    value="gemini",
-                    emoji="✨",
-                    description="Текст и изображения",
-                )
-            )
-        for key, provider in OPENAI_PROVIDERS.items():
-            if cog.provider_keys.get(key):
-                provider_options.append(
-                    disnake.SelectOption(
-                        label=provider["label"][:100],
-                        value=key,
-                        emoji=provider["emoji"],
-                        description=provider["desc"][:100],
-                    )
-                )
+            provider_options.append(disnake.SelectOption(
+                label="Google Gemini",
+                value="gemini",
+                emoji="✨",
+                description="Быстрая + понимает картинки и мемы",
+            ))
+        for p_key, p_meta in OPENAI_PROVIDERS.items():
+            if cog.provider_keys.get(p_key):
+                provider_options.append(disnake.SelectOption(
+                    label=p_meta["label"][:100],
+                    value=p_key,
+                    emoji=p_meta["emoji"],
+                    description=p_meta["desc"][:100],
+                ))
 
         self.provider_select = disnake.ui.Select(
-            placeholder="🧠 Выбери провайдера", options=provider_options, row=0
+            placeholder="🧠 Выберите модель нейросети...",
+            options=provider_options,
+            row=0,
         )
         self.provider_select.callback = self._on_provider_select
         self.add_item(self.provider_select)
         self._sync_components(current_cfg)
 
     def _sync_components(self, cfg: Dict[str, Any]):
-        enabled = cfg.get("aiEnabled", True) is not False
+        is_enabled = cfg.get("aiEnabled", True) is not False
         provider = cfg.get("aiProvider") or "auto"
         chance = int(cfg.get("aiAutoReplyChance") or 0)
 
-        self.toggle_btn.label = "Выключить ИИ" if enabled else "Включить ИИ"
-        self.toggle_btn.style = (
-            disnake.ButtonStyle.danger if enabled else disnake.ButtonStyle.success
-        )
-        self.toggle_btn.emoji = "🔴" if enabled else "🟢"
+        self.toggle_btn.label = "Выключить ИИ" if is_enabled else "Включить ИИ"
+        self.toggle_btn.style = disnake.ButtonStyle.danger if is_enabled else disnake.ButtonStyle.success
+        self.toggle_btn.emoji = "🔴" if is_enabled else "🟢"
 
-        for option in self.provider_select.options:
-            option.default = option.value == provider
-        for option in self.chance_select.options:
-            option.default = int(option.value) == chance
+        for opt in self.provider_select.options:
+            opt.default = opt.value == provider
+
+        for opt in self.chance_select.options:
+            opt.default = int(opt.value) == chance
 
     async def build_embed(self, guild: disnake.Guild) -> disnake.Embed:
         cfg = await self.cog.get_ai_config(guild.id)
         self._sync_components(cfg)
 
-        enabled = cfg.get("aiEnabled", True) is not False
+        is_enabled = cfg.get("aiEnabled", True) is not False
         provider = cfg.get("aiProvider") or "auto"
         chance = int(cfg.get("aiAutoReplyChance") or 0)
         scenario = cfg.get("aiCustomScenario")
         rules = cfg.get("aiCustomRules")
 
-        status = "🟢 Включён" if enabled else "🔴 Отключён"
-        provider_label = PROVIDER_NAMES.get(provider, provider)
-        chance_label = CHANCE_LABELS.get(chance, f"{chance}%")
-        scenario_label = (
-            f"📝 *«{scenario[:120]}{'…' if len(scenario) > 120 else ''}»*"
-            if scenario
-            else "Стандартный характер Mirei"
-        )
-        rules_label = (
-            f"📝 Заданы вручную ({len(rules)} симв.)"
-            if rules
-            else "🔍 Чтение из канала правил"
-        )
+        status_str = "🟢 **Активен** (Отвечает на упоминания и команды)" if is_enabled else "🔴 **Отключен** (ИИ не отвечает на сервере)"
+        model_str = f"**{PROVIDER_NAMES.get(provider, provider)}**"
+        chance_str = f"**{CHANCE_LABELS.get(chance, f'{chance}% шанс')}**"
+        scenario_str = f"📝 Задан свой: *«{scenario[:120]}{'...' if len(scenario) > 120 else ''}»*" if scenario else "⚪ *По умолчанию (Дружелюбный характер Mirei)*"
+        rules_str = f"📝 Заданы вручную (*{len(rules)} симв.*)" if rules else "🔍 *Автоматическое чтение из канала `#правила`*"
 
         embed = disnake.Embed(
-            title="💠 Настройки ИИ Mirei",
-            description=f"Сервер **{guild.name}**",
+            title="💠 Центр управления ИИ Mirei",
+            description=f"Все настройки нейросети для сервера **{guild.name}** сохраняются в базу данных:",
             color=BRAND_COLOR,
         )
         if guild.icon:
             embed.set_thumbnail(url=guild.icon.url)
 
-        embed.add_field(name="📡 Статус", value=status, inline=False)
-        embed.add_field(name="🧠 Провайдер", value=provider_label, inline=True)
-        embed.add_field(name="💬 Автоответы", value=chance_label, inline=True)
-        embed.add_field(name="🎬 Сценарий", value=scenario_label, inline=False)
-        embed.add_field(name="📜 Правила сервера", value=rules_label, inline=False)
+        embed.add_field(name="📡 Статус модуля", value=status_str, inline=False)
+        embed.add_field(name="🧠 Активная модель", value=model_str, inline=True)
+        embed.add_field(name="💬 Живое участие в чате", value=chance_str, inline=True)
+        embed.add_field(name="🎬 Индивидуальный сценарий", value=scenario_str, inline=False)
+        embed.add_field(name="📜 Знание правил сервера", value=rules_str, inline=False)
         embed.set_footer(text=UNIFIED_FOOTER)
         return embed
 
     async def _check_access(self, inter: disnake.MessageInteraction) -> bool:
         await self.cog._ensure_creator_id()
-        if (
-            not inter.author.guild_permissions.administrator
-            and inter.author.id not in self.cog.creator_ids
-        ):
+        if not inter.author.guild_permissions.administrator and inter.author.id not in self.cog.creator_ids:
             await inter.response.send_message(
                 "⛔ Управлять этой панелью могут только администраторы сервера.",
                 ephemeral=True,
@@ -422,63 +345,49 @@ class AIControlPanelView(disnake.ui.View):
         if not await self._check_access(inter):
             return
         await inter.response.defer()
-
         chosen = self.provider_select.values[0]
         saved = await self.cog.update_ai_config(self.guild_id, aiProvider=chosen)
         embed = await self.build_embed(inter.guild)
-        warning = None if saved else "⚠️ Ошибка сохранения в БД."
-        await inter.edit_original_response(content=warning, embed=embed, view=self)
+        warn = None if saved else "⚠️ Ошибка сохранения в БД."
+        await inter.edit_original_response(content=warn, embed=embed, view=self)
 
     @disnake.ui.select(
-        placeholder="💬 Настроить шанс автоответа",
+        placeholder="💬 Настроить шанс участия в обычном чате...",
         row=1,
         options=[
-            disnake.SelectOption(label="Выключено (0%)", value="0", emoji="🔇"),
-            disnake.SelectOption(label="Редко (5%)", value="5", emoji="🌱"),
-            disnake.SelectOption(label="Средне (10%)", value="10", emoji="💬"),
-            disnake.SelectOption(label="Активно (20%)", value="20", emoji="🔥"),
-            disnake.SelectOption(label="Очень часто (35%)", value="35", emoji="⚡"),
+            disnake.SelectOption(label="Выключено (0%)", value="0", emoji="🔇", description="Отвечает только когда её тегнули или сделали Reply"),
+            disnake.SelectOption(label="Редко (5%)", value="5", emoji="🌱", description="Иногда комментирует сообщения в чате"),
+            disnake.SelectOption(label="Средне (10%)", value="10", emoji="💬", description="Умеренно участвует в живой беседе"),
+            disnake.SelectOption(label="Активно (20%)", value="20", emoji="🔥", description="Часто поддерживает разговор в чате"),
+            disnake.SelectOption(label="Очень часто (35%)", value="35", emoji="⚡", description="Максимальная активность в беседе"),
         ],
     )
-    async def chance_select(
-        self, select: disnake.ui.Select, inter: disnake.MessageInteraction
-    ):
+    async def chance_select(self, select: disnake.ui.Select, inter: disnake.MessageInteraction):
         if not await self._check_access(inter):
             return
         await inter.response.defer()
-
-        chance = int(select.values[0])
-        saved = await self.cog.update_ai_config(self.guild_id, aiAutoReplyChance=chance)
+        chosen_chance = int(select.values[0])
+        saved = await self.cog.update_ai_config(self.guild_id, aiAutoReplyChance=chosen_chance)
         embed = await self.build_embed(inter.guild)
-        warning = None if saved else "⚠️ Ошибка сохранения в БД."
-        await inter.edit_original_response(content=warning, embed=embed, view=self)
+        warn = None if saved else "⚠️ Ошибка сохранения в БД."
+        await inter.edit_original_response(content=warn, embed=embed, view=self)
 
-    @disnake.ui.button(
-        label="Выключить ИИ", style=disnake.ButtonStyle.danger, emoji="🔴", row=2
-    )
-    async def toggle_btn(
-        self, button: disnake.ui.Button, inter: disnake.MessageInteraction
-    ):
+    @disnake.ui.button(label="Выключить ИИ", style=disnake.ButtonStyle.danger, emoji="🔴", row=2)
+    async def toggle_btn(self, button: disnake.ui.Button, inter: disnake.MessageInteraction):
         if not await self._check_access(inter):
             return
         await inter.response.defer()
-
         cfg = await self.cog.get_ai_config(self.guild_id)
-        enabled = cfg.get("aiEnabled", True) is not False
-        saved = await self.cog.update_ai_config(self.guild_id, aiEnabled=not enabled)
+        new_state = not (cfg.get("aiEnabled", True) is not False)
+        saved = await self.cog.update_ai_config(self.guild_id, aiEnabled=new_state)
         embed = await self.build_embed(inter.guild)
-        warning = None if saved else "⚠️ Ошибка сохранения в БД."
-        await inter.edit_original_response(content=warning, embed=embed, view=self)
+        warn = None if saved else "⚠️ Ошибка сохранения в БД."
+        await inter.edit_original_response(content=warn, embed=embed, view=self)
 
-    @disnake.ui.button(
-        label="Сценарий и правила", style=disnake.ButtonStyle.secondary, emoji="📝", row=2
-    )
-    async def customize_btn(
-        self, button: disnake.ui.Button, inter: disnake.MessageInteraction
-    ):
+    @disnake.ui.button(label="Сценарий и Правила", style=disnake.ButtonStyle.secondary, emoji="📝", row=2)
+    async def customize_btn(self, button: disnake.ui.Button, inter: disnake.MessageInteraction):
         if not await self._check_access(inter):
             return
-
         cfg = await self.cog.get_ai_config(self.guild_id)
         await inter.response.send_modal(
             AICustomizeModal(
@@ -489,23 +398,17 @@ class AIControlPanelView(disnake.ui.View):
             )
         )
 
-    @disnake.ui.button(
-        label="Очистить память чата", style=disnake.ButtonStyle.secondary, emoji="♻️", row=2
-    )
-    async def reset_memory_btn(
-        self, button: disnake.ui.Button, inter: disnake.MessageInteraction
-    ):
+    @disnake.ui.button(label="Очистить память чата", style=disnake.ButtonStyle.secondary, emoji="♻️", row=2)
+    async def reset_memory_btn(self, button: disnake.ui.Button, inter: disnake.MessageInteraction):
         if not await self._check_access(inter):
             return
-
         self.cog._clear_channel_memory(inter.channel.id)
-        await inter.response.send_message(
-            "♻️ Память диалога Mirei в этом канале очищена.", ephemeral=True
-        )
+        await inter.response.send_message("♻️ Память диалога Mirei в этом канале очищена!", ephemeral=True)
+
+
 class AIChat(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-
         self.gemini_key = (os.getenv("LLM_API_KEY") or os.getenv("GEMINI_API_KEY") or "").strip()
         self.provider_keys: Dict[str, str] = {
             name: (os.getenv(meta["env_key"]) or "").strip()
@@ -514,9 +417,8 @@ class AIChat(commands.Cog):
 
         env_gemini = (os.getenv("GEMINI_MODELS") or "").strip()
         self.gemini_models: List[str] = (
-            [model.strip() for model in env_gemini.split(",") if model.strip()]
-            if env_gemini
-            else list(DEFAULT_GEMINI_MODELS)
+            [m.strip() for m in env_gemini.split(",") if m.strip()]
+            if env_gemini else list(DEFAULT_GEMINI_MODELS)
         )
         self._gemini_models_verified = False
 
@@ -555,34 +457,25 @@ class AIChat(commands.Cog):
 
     def _get_channel_history(self, channel_id: int) -> deque:
         now = time.time()
-        last_active = self._memory_last_active.get(channel_id, 0.0)
-        if last_active and now - last_active > MEMORY_TTL_SECONDS:
+        last_ts = self._memory_last_active.get(channel_id, 0.0)
+        if last_ts and (now - last_ts) > MEMORY_TTL_SECONDS:
             self._clear_channel_memory(channel_id)
 
         if len(self.memory) > MAX_MEMORY_CHANNELS:
-            expired = [
-                channel
-                for channel, timestamp in self._memory_last_active.items()
-                if now - timestamp > MEMORY_TTL_SECONDS
-            ]
-            for channel in expired:
-                self._clear_channel_memory(channel)
-
+            expired = [cid for cid, ts in self._memory_last_active.items() if (now - ts) > MEMORY_TTL_SECONDS]
+            for cid in expired:
+                self._clear_channel_memory(cid)
             if len(self.memory) > MAX_MEMORY_CHANNELS:
-                oldest = sorted(
-                    self._memory_last_active.items(), key=lambda item: item[1]
-                )[: len(self.memory) // 5]
-                for channel, _ in oldest:
-                    self._clear_channel_memory(channel)
+                oldest = sorted(self._memory_last_active.items(), key=lambda x: x[1])[: len(self.memory) // 5]
+                for cid, _ in oldest:
+                    self._clear_channel_memory(cid)
 
         self._memory_last_active[channel_id] = now
         return self.memory.setdefault(channel_id, deque(maxlen=15))
 
     async def _get_session(self) -> aiohttp.ClientSession:
         if self._session is None or self._session.closed:
-            connector = aiohttp.TCPConnector(
-                family=socket.AF_INET, limit=50, ttl_dns_cache=300
-            )
+            connector = aiohttp.TCPConnector(family=socket.AF_INET, limit=50, ttl_dns_cache=300)
             self._session = aiohttp.ClientSession(
                 connector=connector,
                 timeout=aiohttp.ClientTimeout(total=15),
@@ -591,143 +484,124 @@ class AIChat(commands.Cog):
 
     @commands.Cog.listener()
     async def on_ready(self):
+        """Проверяет модели Gemini при запуске через ListModels."""
         await self._verify_gemini_models()
 
     async def _verify_gemini_models(self):
         if self._gemini_models_verified or not self.gemini_key:
             return
-
         try:
             session = await self._get_session()
             url = "https://generativelanguage.googleapis.com/v1beta/models"
             headers = {"x-goog-api-key": self.gemini_key}
-            timeout = aiohttp.ClientTimeout(total=8)
-
-            async with session.get(url, headers=headers, timeout=timeout) as response:
-                if response.status != 200:
-                    log.warning("Gemini ListModels вернул статус %s", response.status)
-                    return
-
-                data = await response.json()
-                available = {
-                    model.get("name", "").replace("models/", "")
-                    for model in data.get("models") or []
-                    if "generateContent" in (model.get("supportedGenerationMethods") or [])
-                }
-                filtered = [model for model in self.gemini_models if model in available]
-                if filtered:
-                    self.gemini_models = filtered
-                    log.info(
-                        "Подтверждённые модели Gemini: %s",
-                        ", ".join(self.gemini_models),
-                    )
+            async with session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=8)) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    available = {
+                        m.get("name", "").replace("models/", "")
+                        for m in (data.get("models") or [])
+                        if "generateContent" in (m.get("supportedGenerationMethods") or [])
+                    }
+                    filtered = [m for m in self.gemini_models if m in available]
+                    if filtered:
+                        self.gemini_models = filtered
+                        log.info("Подтверждённые модели Gemini: %s", ", ".join(self.gemini_models))
+                    else:
+                        log.warning("Ни одна модель из списка Gemini не найдена в ListModels; оставляем исходный список.")
+                    self._gemini_models_verified = True
                 else:
-                    log.warning(
-                        "Gemini ListModels не подтвердил настроенные модели. "
-                        "Сохраняем список из конфигурации."
-                    )
-                self._gemini_models_verified = True
-        except Exception as error:
-            log.warning("Не удалось проверить список моделей Gemini: %s", error)
+                    log.warning("Gemini ListModels вернул статус %s", resp.status)
+        except Exception as e:
+            log.warning("Не удалось проверить список моделей Gemini: %s", e)
 
     async def get_ai_config(self, guild_id: int) -> Dict[str, Any]:
         now = time.time()
         cached = self._ai_cfg_cache.get(guild_id)
-        if cached and now - cached[0] < AI_CFG_CACHE_TTL:
+        if cached and (now - cached[0]) < AI_CFG_CACHE_TTL:
             return cached[1]
 
-        db_config = await api.get_guild_config(str(guild_id)) or {}
-        ai = db_config.get("ai") or {}
-        security = db_config.get("security") or {}
-        config = {
-            "aiEnabled": ai.get("enabled", True),
-            "aiProvider": ai.get("provider") or "auto",
-            "aiAutoReplyChance": int(ai.get("autoReplyChance") or 0),
-            "aiCustomScenario": ai.get("customScenario"),
-            "aiCustomRules": ai.get("customRules"),
-            "logChannelId": db_config.get("logChannelId"),
-            "verificationRoleId": security.get("verificationRoleId"),
-            "trapChannelId": security.get("trapChannelId"),
+        db_cfg = await api.get_guild_config(str(guild_id)) or {}
+        ai_sub = db_cfg.get("ai") or {}
+        sec_sub = db_cfg.get("security") or {}
+
+        result = {
+            "aiEnabled": ai_sub.get("enabled", True),
+            "aiProvider": ai_sub.get("provider") or "auto",
+            "aiAutoReplyChance": int(ai_sub.get("autoReplyChance") or 0),
+            "aiCustomScenario": ai_sub.get("customScenario"),
+            "aiCustomRules": ai_sub.get("customRules"),
+            "logChannelId": db_cfg.get("logChannelId"),
+            "verificationRoleId": sec_sub.get("verificationRoleId"),
+            "trapChannelId": sec_sub.get("trapChannelId"),
         }
 
         if len(self._ai_cfg_cache) > MAX_RULES_CACHE_GUILDS:
             self._ai_cfg_cache = {
-                key: value
-                for key, value in self._ai_cfg_cache.items()
-                if now - value[0] < AI_CFG_CACHE_TTL
+                gid: v for gid, v in self._ai_cfg_cache.items()
+                if (now - v[0]) < AI_CFG_CACHE_TTL
             }
-
-        self._ai_cfg_cache[guild_id] = (now, config)
-        return config
+        self._ai_cfg_cache[guild_id] = (now, result)
+        return result
 
     async def update_ai_config(self, guild_id: int, **kwargs) -> bool:
         current = dict(await self.get_ai_config(guild_id))
         current.update(kwargs)
 
-        payload = {
+        ai_payload = {
             "enabled": current.get("aiEnabled", True),
             "provider": current.get("aiProvider") or "auto",
             "autoReplyChance": int(current.get("aiAutoReplyChance") or 0),
             "customScenario": current.get("aiCustomScenario"),
             "customRules": current.get("aiCustomRules"),
         }
-        saved = await api.update_ai_config(str(guild_id), payload)
+        saved = await api.update_ai_config(str(guild_id), ai_payload)
         if saved:
             self._ai_cfg_cache[guild_id] = (time.time(), current)
         return saved
 
     def _build_bot_capabilities(self, user_text: str) -> str:
-        command_lines: List[str] = []
+        cmd_lines: List[str] = []
         short_names: List[str] = []
 
-        for command in sorted(self.bot.slash_commands, key=lambda item: item.name):
-            staff_only = bool(
-                command.default_member_permissions
-                and command.default_member_permissions.value != 0
-            )
-            tag = " [Персонал]" if staff_only else ""
-            children = getattr(command, "children", None)
+        for cmd in sorted(self.bot.slash_commands, key=lambda c: c.name):
+            is_mod = bool(cmd.default_member_permissions and cmd.default_member_permissions.value != 0)
+            tag = " [Персонал]" if is_mod else ""
+            children = getattr(cmd, "children", None)
             if children:
-                sub_names = ", ".join(sorted(children))
-                short_names.append(f"/{command.name} ({sub_names})")
-                for name, subcommand in sorted(children.items()):
-                    description = getattr(subcommand, "description", "") or command.description
-                    command_lines.append(f"• /{command.name} {name}{tag} — {description}")
+                sub_names = ", ".join(sorted(children.keys()))
+                short_names.append(f"/{cmd.name} ({sub_names})")
+                for sub_name, sub_cmd in sorted(children.items()):
+                    desc = getattr(sub_cmd, "description", "") or cmd.description
+                    cmd_lines.append(f"• /{cmd.name} {sub_name}{tag} — {desc}")
             else:
-                short_names.append(f"/{command.name}")
-                command_lines.append(f"• /{command.name}{tag} — {command.description}")
+                short_names.append(f"/{cmd.name}")
+                cmd_lines.append(f"• /{cmd.name}{tag} — {cmd.description}")
 
-        text = user_text.lower()
-        need_details = any(
-            word in text
-            for word in (
-                "команд", "умеешь", "можешь", "функц", "помог", "настро", "сдела",
-                "как работает", "капч", "войс", "статист", "верифи", "роли", "роль",
-                "ловуш", "лог", "аудит", "мут", "бан", "кик", "help", "stats", "ai",
-            )
-        )
+        low = user_text.lower()
+        need_details = any(k in low for k in (
+            "команд", "умеешь", "можешь", "функц", "помог", "настро", "сдела",
+            "как работает", "капч", "войс", "статист", "верифи", "роли", "роль",
+            "ловуш", "лог", "аудит", "мут", "бан", "кик", "help", "stats", "ai"
+        ))
 
         if not need_details:
             return f"\n[ТВОИ РЕАЛЬНЫЕ КОМАНДЫ: {', '.join(short_names)}]"
 
         mechanics = (
-            "• Верификация: капча применяется к новым аккаунтам, если она включена. "
-            "Роли могут восстанавливаться из базы.\n"
-            "• Временные комнаты: при входе в канал-генератор создаётся комната "
-            "с панелью управления. Когда комната пустеет, бот удаляет её.\n"
-            "• Статистика: счётчики обновляются каждые 10 минут.\n"
-            "• Канал-ловушка: бот удаляет сообщение и исключает участника."
+            "• Верификация и Капча: при включённой капче код спрашивается только у новых аккаунтов (<7 дн.); роли возвращаются из БД.\n"
+            "• Приватные войсы: при входе в канал-генератор создаётся личная комната с панелью (замок, имя, кик, лимит), удаляется когда все выходят.\n"
+            "• Статистика: счётчики в каналах обновляются автоматически каждые 10 минут.\n"
+            "• Канал-ловушка: удаляет сообщения и кикает за любое сообщение."
         )
         return (
             "\n\n[ТВОИ РЕАЛЬНЫЕ КОМАНДЫ]:\n"
-            + "\n".join(command_lines)
+            + "\n".join(cmd_lines)
             + f"\n\nКак устроены модули:\n{mechanics}"
         )
 
     async def _ensure_creator_id(self):
         if self._creator_fetched:
             return
-
         try:
             app_info = await self.bot.application_info()
             if app_info.owner:
@@ -739,71 +613,48 @@ class AIChat(commands.Cog):
         except Exception:
             pass
 
-    def _has_any_mod_permission(
-        self, author: disnake.abc.User, guild: Optional[disnake.Guild]
-    ) -> bool:
+    def _has_any_mod_permission(self, author: disnake.abc.User, guild: Optional[disnake.Guild]) -> bool:
         if not guild or not isinstance(author, disnake.Member):
             return False
         if author.id == guild.owner_id or author.id in self.creator_ids:
             return True
+        p = author.guild_permissions
+        return any((p.administrator, p.moderate_members, p.kick_members, p.ban_members, p.manage_messages, p.manage_channels))
 
-        permissions = author.guild_permissions
-        return any((
-            permissions.administrator,
-            permissions.moderate_members,
-            permissions.kick_members,
-            permissions.ban_members,
-            permissions.manage_messages,
-            permissions.manage_channels,
-        ))
-
-    async def _get_author_identity_tag(
-        self, author: disnake.abc.User, guild: Optional[disnake.Guild]
-    ) -> str:
+    async def _get_author_identity_tag(self, author: disnake.abc.User, guild: Optional[disnake.Guild]) -> str:
         await self._ensure_creator_id()
 
         is_creator = author.id in self.creator_ids
         is_guild_owner = bool(guild and author.id == guild.owner_id)
 
         if is_creator and is_guild_owner:
-            return (
-                f"⚡ [СИСТЕМНАЯ МЕТКА: Пишет твой создатель Disu (ID: {author.id}), "
-                f"владелец сервера. Ник: «{author.display_name}».]"
-            )
+            return f"⚡ [СИСТЕМНАЯ МЕТКА: Пишет твой СОЗДАТЕЛЬ Disu (ID: {author.id}), владелец сервера. Ник: «{author.display_name}».]"
         if is_creator:
-            return (
-                f"⚡ [СИСТЕМНАЯ МЕТКА: Пишет твой создатель Disu (ID: {author.id}) "
-                f"под ником «{author.display_name}».]"
-            )
+            return f"⚡ [СИСТЕМНАЯ МЕТКА: Пишет твой СОЗДАТЕЛЬ Disu (ID: {author.id}) под ником «{author.display_name}».]"
         if is_guild_owner:
-            return (
-                f"👑 [СИСТЕМНАЯ МЕТКА: Пишет владелец сервера "
-                f"«{author.display_name}».]"
-            )
+            return f"👑 [СИСТЕМНАЯ МЕТКА: Пишет владелец сервера «{author.display_name}» (глобальный создатель — Disu).]"
         return ""
 
     @staticmethod
     def _parse_action_params(raw_params: str) -> Dict[str, str]:
-        params: Dict[str, str] = {}
+        result: Dict[str, str] = {}
         for part in raw_params.split("|"):
             if "=" in part:
-                name, value = part.split("=", 1)
-                params[name.strip().lower()] = value.strip()
-        return params
+                k, v = part.split("=", 1)
+                result[k.strip().lower()] = v.strip()
+        return result
 
-    def _can_moderate_target(
-        self, guild: disnake.Guild, actor: disnake.Member, target: disnake.Member
-    ) -> Optional[str]:
+    def _can_moderate_target(self, guild: disnake.Guild, actor: disnake.Member, target: disnake.Member) -> Optional[str]:
         if target.id == actor.id:
             return "нельзя применить действие к самому себе"
         if target.id == self.bot.user.id:
             return "нельзя применить действие ко мне"
         if target.id == guild.owner_id:
-            return "нельзя применить действие к владельцу сервера"
+            return "нельзя наказать владельца сервера"
         if actor.id != guild.owner_id and target.top_role >= actor.top_role:
             return "роль этого участника равна или выше твоей"
         if guild.me and target.top_role >= guild.me.top_role:
-            return "роль этого участника равна или выше роли бота"
+            return "роль этого участника выше моей роли в настройках сервера"
         return None
 
     async def _execute_ai_action(
@@ -812,82 +663,91 @@ class AIChat(commands.Cog):
         ref_msg: Optional[disnake.Message],
         raw_action: str,
     ) -> Tuple[str, Optional[disnake.ui.View]]:
+        if not message.guild or not isinstance(message.author, disnake.Member):
+            return "⚠️ Действия модерации доступны только на сервере.", None
+
         guild = message.guild
         actor = message.author
-        if guild is None or not isinstance(actor, disnake.Member):
-            return "⚠️ Действия модерации доступны на сервере.", None
 
-        action, _, raw_params = raw_action.partition("|")
-        action = action.strip().lower()
+        parts = [p.strip() for p in raw_action.split("|")]
+        action_name = parts[0].lower() if parts else ""
+        params = self._parse_action_params("|".join(parts[1:]))
 
-        if action in {"timeout", "clear", "lock", "unlock", "slowmode"}:
-            return f"Для этого действия используй команду `/{action}`.", None
+        allowed_target_ids: Set[int] = {m.id for m in message.mentions if m.id != self.bot.user.id}
+        if ref_msg and ref_msg.author.id != self.bot.user.id:
+            allowed_target_ids.add(ref_msg.author.id)
 
-        permission = {"kick": "kick_members", "ban": "ban_members"}.get(action)
-        if permission is None:
-            return "", None
-        if not getattr(actor.guild_permissions, permission):
-            return f"⛔ У тебя нет прав на `{action}`.", None
+        def extract_verified_target() -> Optional[disnake.Member]:
+            if "user_id" in params:
+                raw_uid = params["user_id"]
+                if not (raw_uid.isascii() and raw_uid.isdecimal() and len(raw_uid) <= 20):
+                    return None
+                uid = int(raw_uid)
+                return guild.get_member(uid) if uid in allowed_target_ids else None
+            if len(allowed_target_ids) == 1:
+                return guild.get_member(next(iter(allowed_target_ids)))
+            return None
 
-        allowed_ids: Set[int] = {member.id for member in message.mentions}
-        if ref_msg:
-            allowed_ids.add(ref_msg.author.id)
-        allowed_ids.discard(self.bot.user.id)
+        if action_name in ("kick", "ban"):
+            has_perm = (
+                (action_name == "kick" and actor.guild_permissions.kick_members)
+                or (action_name == "ban" and actor.guild_permissions.ban_members)
+            )
+            if not has_perm:
+                return f"⛔ У тебя нет прав на `{action_name}` участников.", None
 
-        params = self._parse_action_params(raw_params)
-        provided_id = params.get("user_id", "")
-        if provided_id.isdecimal() and int(provided_id) in allowed_ids:
-            target = guild.get_member(int(provided_id))
-        elif not provided_id and len(allowed_ids) == 1:
-            target = guild.get_member(next(iter(allowed_ids)))
-        else:
-            target = None
+            target = extract_verified_target()
+            if not target:
+                return "⚠️ Чтобы выполнить действие, явно тегни участника (`@ник`) или ответь на его сообщение.", None
+            if err := self._can_moderate_target(guild, actor, target):
+                return f"⛔ Не могу выполнить: {err}.", None
 
-        if target is None:
-            return "⚠️ Укажи участника упоминанием или ответь на его сообщение.", None
+            default_reason = "Заблокирован через Mirei" if action_name == "ban" else "Исключен через Mirei"
+            reason = (params.get("reason") or default_reason)[:200]
+            verb = "заблокировать (БАН)" if action_name == "ban" else "исключить (КИК)"
+            view = ConfirmModActionView(actor.id, action_name, target, reason)
+            return f"⚠️ Подтверди действие: **{verb}** участника **{target.display_name}** (`{target.id}`)?\n*Причина: {reason}*", view
 
-        if error := self._can_moderate_target(guild, actor, target):
-            return f"⛔ Не могу выполнить: {error}.", None
+        moderation_commands = {
+            "timeout": "/модерация мут",
+            "clear": "/модерация очистить",
+            "lock": "/модерация закрыть",
+            "unlock": "/модерация открыть",
+            "slowmode": "/модерация медленный_режим",
+        }
+        if command := moderation_commands.get(action_name):
+            return f"Для этого действия используй команду `{command}`.", None
 
-        default_reason = "Заблокирован через Mirei" if action == "ban" else "Исключён через Mirei"
-        reason = (params.get("reason") or default_reason)[:200]
-        verb = "заблокировать" if action == "ban" else "исключить"
-        view = ConfirmModActionView(actor.id, action, target, reason)
-        text = (
-            f"⚠️ Подтверди действие: **{verb}** участника **{target.display_name}** "
-            f"(`{target.id}`)?\n*Причина: {reason}*"
-        )
-        return text, view
+        return "", None
 
     @staticmethod
     def _extract_embeds_text(embeds: List[disnake.Embed]) -> str:
         if not embeds:
             return ""
-
         parts = []
-        for index, embed in enumerate(embeds[:2], 1):
+        for idx, emb in enumerate(embeds[:2], 1):
             items = []
-            if embed.author and embed.author.name:
-                items.append(f"Автор: {embed.author.name}")
-            if embed.title:
-                items.append(f"Заголовок: {embed.title}")
-            if embed.description:
-                items.append(f"Текст: {embed.description[:800]}")
-            for field in embed.fields[:6]:
-                items.append(f"{field.name}: {field.value[:200]}")
-            if embed.footer and embed.footer.text:
-                items.append(f"Подвал: {embed.footer.text}")
+            if emb.author and emb.author.name:
+                items.append(f"Автор: {emb.author.name}")
+            if emb.title:
+                items.append(f"Заголовок: {emb.title}")
+            if emb.description:
+                items.append(f"Текст: {emb.description[:800]}")
+            for f in emb.fields[:6]:
+                items.append(f"{f.name}: {f.value[:200]}")
+            if emb.footer and emb.footer.text:
+                items.append(f"Подвал: {emb.footer.text}")
             if items:
-                parts.append(f"[Вложение Embed #{index} -> " + " | ".join(items) + "]")
+                parts.append(f"[Вложение Embed #{idx} -> " + " | ".join(items) + "]")
         return "\n".join(parts)
 
     @staticmethod
     def _extract_embed_image_url(embeds: List[disnake.Embed]) -> Optional[str]:
-        for embed in embeds:
-            if embed.image and embed.image.url:
-                return embed.image.url
-            if embed.thumbnail and embed.thumbnail.url:
-                return embed.thumbnail.url
+        for emb in embeds:
+            if emb.image and emb.image.url:
+                return emb.image.url
+            if emb.thumbnail and emb.thumbnail.url:
+                return emb.thumbnail.url
         return None
 
     async def _download_image_base64(
@@ -898,7 +758,6 @@ class AIChat(commands.Cog):
         url = attachment.url if attachment else image_url
         if not url:
             return None
-
         try:
             parsed = urllib.parse.urlsplit(url)
             if (
@@ -911,161 +770,142 @@ class AIChat(commands.Cog):
             limit = 4 * 1024 * 1024
             if attachment and attachment.size > limit:
                 return None
-
             session = await self._get_session()
             timeout = aiohttp.ClientTimeout(total=7)
-            async with session.get(url, timeout=timeout, allow_redirects=False) as response:
-                content_type = response.content_type.lower()
-                if response.status != 200 or content_type not in ALLOWED_IMAGE_TYPES:
+            async with session.get(url, timeout=timeout, allow_redirects=False) as resp:
+                content_type = resp.content_type.lower()
+                if resp.status != 200 or content_type not in ALLOWED_IMAGE_TYPES:
                     return None
-                if response.content_length is not None and response.content_length > limit:
+                if resp.content_length is not None and resp.content_length > limit:
                     return None
 
                 data = bytearray()
-                async for chunk in response.content.iter_chunked(64 * 1024):
+                async for chunk in resp.content.iter_chunked(64 * 1024):
                     if len(data) + len(chunk) > limit:
                         return None
                     data.extend(chunk)
-
                 if data:
                     return content_type, base64.b64encode(data).decode("ascii")
-
         except (ValueError, aiohttp.ClientError, asyncio.TimeoutError):
             pass
-
         return None
 
-    async def _get_server_rules_text(
-        self, guild: disnake.Guild, cfg: Dict[str, Any]
-    ) -> str:
-        custom_rules = cfg.get("aiCustomRules")
-        if custom_rules:
-            return custom_rules[:1500]
+    async def _get_server_rules_text(self, guild: disnake.Guild, cfg: Dict[str, Any]) -> str:
+        custom = cfg.get("aiCustomRules")
+        if custom:
+            return custom[:1500]
 
         now = time.time()
         cached = self.rules_cache.get(guild.id)
-        if cached and now - cached[0] < RULES_CACHE_TTL:
+        if cached and (now - cached[0]) < RULES_CACHE_TTL:
             return cached[1]
 
         if len(self.rules_cache) > MAX_RULES_CACHE_GUILDS:
             self.rules_cache = {
-                key: value
-                for key, value in self.rules_cache.items()
-                if now - value[0] < RULES_CACHE_TTL
+                gid: v for gid, v in self.rules_cache.items()
+                if (now - v[0]) < RULES_CACHE_TTL
             }
 
-        rules_channel = guild.rules_channel
+        rules_channel: Optional[disnake.TextChannel] = guild.rules_channel
         if not rules_channel:
-            for channel in guild.text_channels:
-                if any(word in channel.name.lower() for word in ("правил", "rules", "устав")):
-                    rules_channel = channel
+            for ch in guild.text_channels:
+                if any(k in ch.name.lower() for k in ("правил", "rules", "устав")):
+                    rules_channel = ch
                     break
 
         if not rules_channel:
-            text = "Канал правил не найден."
+            text = "Специальный канал правил не найден, действуют общие нормы адекватности."
             self.rules_cache[guild.id] = (now, text)
             return text
 
         collected = []
         try:
-            async for message in rules_channel.history(limit=5, oldest_first=True):
-                if message.content:
-                    collected.append(message.content[:1000])
-                if message.embeds:
-                    collected.append(self._extract_embeds_text(message.embeds))
+            async for msg in rules_channel.history(limit=5, oldest_first=True):
+                if msg.content:
+                    collected.append(msg.content[:1000])
+                if msg.embeds:
+                    collected.append(self._extract_embeds_text(msg.embeds))
         except disnake.HTTPException:
             pass
 
-        rules = (
-            "\n".join(collected)[:1500]
-            if collected
-            else f"Правила находятся в канале {rules_channel.mention}."
-        )
-        self.rules_cache[guild.id] = (now, rules)
-        return rules
+        rules_text = "\n".join(collected)[:1500] if collected else f"Правила находятся в канале {rules_channel.mention}."
+        self.rules_cache[guild.id] = (now, rules_text)
+        return rules_text
 
-    def _get_public_channels_cached(
-        self, guild: disnake.Guild, cfg: Dict[str, Any]
-    ) -> Tuple[List[str], List[str]]:
+    def _get_public_channels_cached(self, guild: disnake.Guild, cfg: Dict[str, Any]) -> Tuple[List[str], List[str]]:
         now = time.time()
         cached = self._channels_cache.get(guild.id)
-        if cached and now - cached[0] < CHANNELS_CACHE_TTL:
+        if cached and (now - cached[0]) < CHANNELS_CACHE_TTL:
             return cached[1]
 
         staff_keywords = (
             "админ", "адмен", "admin", "модер", "moder", "staff", "стафф",
-            "логи", "logs", "audit", "аудит", "тикет", "ticket", "бан-лист", "руководств",
+            "логи", "logs", "audit", "аудит", "тикет", "ticket", "бан-лист", "руководств"
         )
         counter_keywords = (
             "all members", "members:", "bots:", "online:",
-            "участников:", "онлайн:", "ботов:", "статистик", "stats",
+            "участников:", "онлайн:", "ботов:", "статистик", "stats"
         )
-        log_channel_id = str(cfg.get("logChannelId") or "")
+        log_ch_id = str(cfg.get("logChannelId") or "")
 
         verify_role: Optional[disnake.Role] = None
-        verify_role_id = cfg.get("verificationRoleId")
-        if verify_role_id and str(verify_role_id).isdigit():
-            verify_role = guild.get_role(int(verify_role_id))
+        v_role_id = cfg.get("verificationRoleId")
+        if v_role_id and str(v_role_id).isdigit():
+            verify_role = guild.get_role(int(v_role_id))
 
         if not verify_role:
-            for role in guild.roles:
-                if not role.is_default() and not role.managed and any(
-                    word in role.name.lower()
-                    for word in ("участник", "member", "verif", "игрок", "user")
+            for r in guild.roles:
+                if not r.is_default() and not r.managed and any(
+                    w in r.name.lower() for w in ("участник", "member", "verif", "игрок", "user")
                 ):
-                    verify_role = role
+                    verify_role = r
                     break
 
         check_roles = [guild.default_role]
         if verify_role:
             check_roles.append(verify_role)
 
-        def is_staff_or_hidden_name(channel: disnake.abc.GuildChannel) -> bool:
-            if str(channel.id) == log_channel_id:
+        def is_staff_or_hidden_name(ch: disnake.abc.GuildChannel) -> bool:
+            if str(ch.id) == log_ch_id:
                 return True
-            name = channel.name.lower()
-            category = channel.category.name.lower() if channel.category else ""
-            return any(word in name or word in category for word in staff_keywords)
+            ch_name = ch.name.lower()
+            cat_name = ch.category.name.lower() if ch.category else ""
+            return any(k in ch_name or k in cat_name for k in staff_keywords)
 
-        text_channels: List[str] = []
-        for channel in guild.text_channels:
-            if is_staff_or_hidden_name(channel):
+        text_ch_list: List[str] = []
+        for ch in guild.text_channels:
+            if is_staff_or_hidden_name(ch):
                 continue
-            if any(channel.permissions_for(role).view_channel for role in check_roles):
-                topic = f" ({channel.topic[:40]})" if channel.topic else ""
-                age_tag = " [18+]" if channel.is_nsfw() else ""
-                text_channels.append(f"<#{channel.id}> (#{channel.name}{age_tag}{topic})")
-                if len(text_channels) >= 15:
+            if any(ch.permissions_for(r).view_channel for r in check_roles):
+                topic_str = f" ({ch.topic[:40]})" if ch.topic else ""
+                nsfw_tag = " [18+]" if ch.is_nsfw() else ""
+                text_ch_list.append(f"<#{ch.id}> (#{ch.name}{nsfw_tag}{topic_str})")
+                if len(text_ch_list) >= 15:
                     break
 
-        voice_channels: List[str] = []
-        active_role = verify_role or guild.default_role
-        for channel in guild.voice_channels:
-            if is_staff_or_hidden_name(channel):
+        voice_ch_list: List[str] = []
+        for vc in guild.voice_channels:
+            if is_staff_or_hidden_name(vc):
+                continue
+            vc_low = vc.name.lower()
+            if any(k in vc_low for k in counter_keywords) or re.search(r"[:—\-]\s*\d+\s*$", vc.name):
                 continue
 
-            name = channel.name.lower()
-            if any(word in name for word in counter_keywords) or re.search(
-                r"[:—\-]\s*\d+\s*$", channel.name
-            ):
-                continue
-
-            permissions = channel.permissions_for(active_role)
-            if permissions.view_channel and (permissions.connect or channel == guild.afk_channel):
-                voice_channels.append(f"<#{channel.id}> (🔊 {channel.name})")
-                if len(voice_channels) >= 10:
+            is_afk = vc == guild.afk_channel
+            active_role = verify_role if verify_role else guild.default_role
+            perms = vc.permissions_for(active_role)
+            if perms.view_channel and (perms.connect or is_afk):
+                voice_ch_list.append(f"<#{vc.id}> (🔊 {vc.name})")
+                if len(voice_ch_list) >= 10:
                     break
 
         if len(self._channels_cache) > MAX_RULES_CACHE_GUILDS:
             self._channels_cache = {
-                key: value
-                for key, value in self._channels_cache.items()
-                if now - value[0] < CHANNELS_CACHE_TTL
+                gid: v for gid, v in self._channels_cache.items()
+                if (now - v[0]) < CHANNELS_CACHE_TTL
             }
-
-        result = (text_channels, voice_channels)
-        self._channels_cache[guild.id] = (now, result)
-        return result
+        self._channels_cache[guild.id] = (now, (text_ch_list, voice_ch_list))
+        return text_ch_list, voice_ch_list
 
     async def _build_guild_knowledge(
         self,
@@ -1074,33 +914,30 @@ class AIChat(commands.Cog):
         cfg: Dict[str, Any],
     ) -> str:
         if not guild:
-            return "Диалог идёт в личных сообщениях (DM). Твой создатель — Disu."
+            return "Диалог идет в личных сообщениях (DM). Твой создатель — Disu."
 
-        owner = (
-            f"{guild.owner.display_name} (<@{guild.owner.id}>)"
-            if guild.owner
-            else f"<@{guild.owner_id}>"
-        )
-        text_channels, voice_channels = self._get_public_channels_cached(guild, cfg)
-        text_summary = ", ".join(text_channels) if text_channels else "Нет доступных"
-        voice_summary = ", ".join(voice_channels) if voice_channels else "Нет доступных"
-        rules = await self._get_server_rules_text(guild, cfg)
-        channel_name = getattr(current_channel, "name", "ЛС")
+        owner_str = f"{guild.owner.display_name} (<@{guild.owner.id}>)" if guild.owner else f"<@{guild.owner_id}>"
+        text_ch_list, voice_ch_list = self._get_public_channels_cached(guild, cfg)
+
+        text_summary = ", ".join(text_ch_list) if text_ch_list else "Нет доступных"
+        voice_summary = ", ".join(voice_ch_list) if voice_ch_list else "Нет доступных"
+        rules_text = await self._get_server_rules_text(guild, cfg)
+        curr_ch_name = getattr(current_channel, "name", "ЛС")
 
         return (
-            "\n--- ИНФОРМАЦИЯ О СЕРВЕРЕ ---\n"
+            f"\n--- ИНФОРМАЦИЯ О СЕРВЕРЕ ---\n"
             f"• Сервер: «{guild.name}» (Участников: {guild.member_count})\n"
-            f"• Создатель бота: Disu | Владелец сервера: {owner}\n"
-            f"• Текущий канал: <#{getattr(current_channel, 'id', 0)}> (#{channel_name})\n"
+            f"• Создатель бота: Disu | Владелец сервера: {owner_str}\n"
+            f"• Текущий канал: <#{getattr(current_channel, 'id', 0)}> (#{curr_ch_name})\n"
             f"• Текстовые каналы: {text_summary}\n"
             f"• Голосовые каналы: {voice_summary}\n"
-            f"• Правила:\n{rules}\n"
-            "----------------------------"
+            f"• Правила:\n{rules_text}\n"
+            f"----------------------------"
         )
+
     async def _fetch_weather(self, text: str) -> Optional[str]:
         clean = re.sub(
-            r"\b(?:какая|какой|сейчас|сегодня|завтра|загугли|найди|скажи|покажи|"
-            r"погода|погоду|градусов|температура|в|во|на)\b",
+            r"\b(?:какая|какой|сейчас|сегодня|завтра|загугли|найди|скажи|покажи|погода|погоду|градусов|температура|в|во|на)\b",
             " ",
             text,
             flags=re.IGNORECASE,
@@ -1111,268 +948,191 @@ class AIChat(commands.Cog):
             city_query = "Москва"
 
         session = await self._get_session()
-        timeout = aiohttp.ClientTimeout(total=4)
         headers = {"User-Agent": "MireiDiscordBot/2.0"}
-        latitude, longitude, place_name = None, None, city_query
+        lat, lon, place_name = None, None, city_query
 
         try:
-            async with session.get(
-                "https://nominatim.openstreetmap.org/search",
-                params={
-                    "q": city_query,
-                    "format": "json",
-                    "limit": 1,
-                    "accept-language": "ru",
-                },
-                headers=headers,
-                timeout=timeout,
-            ) as response:
-                if response.status == 200:
-                    results = await response.json()
-                    if results:
-                        result = results[0]
-                        latitude = float(result["lat"])
-                        longitude = float(result["lon"])
-                        place_name = result.get("display_name", city_query).split(",")[0]
+            nom_url = f"https://nominatim.openstreetmap.org/search?q={urllib.parse.quote(city_query)}&format=json&limit=1&accept-language=ru"
+            async with session.get(nom_url, headers=headers, timeout=aiohttp.ClientTimeout(total=4)) as resp:
+                if resp.status == 200:
+                    nom_data = await resp.json()
+                    if nom_data:
+                        lat = float(nom_data[0]["lat"])
+                        lon = float(nom_data[0]["lon"])
+                        place_name = nom_data[0].get("display_name", city_query).split(",")[0]
         except Exception:
             pass
 
-        if latitude is None or longitude is None:
+        if lat is None or lon is None:
             candidates = [city_query]
             if len(city_query) > 4:
-                stem = city_query[:-1]
-                candidates.extend([stem, stem + "а", stem + "я"])
-
-            for candidate in candidates:
+                candidates.extend([city_query[:-1], city_query[:-1] + "а", city_query[:-1] + "я"])
+            for cand in candidates:
                 try:
-                    async with session.get(
-                        "https://geocoding-api.open-meteo.com/v1/search",
-                        params={"name": candidate, "count": 1, "language": "ru"},
-                        timeout=timeout,
-                    ) as response:
-                        if response.status != 200:
-                            continue
-
-                        data = await response.json()
-                        results = data.get("results") or []
-                        if results:
-                            result = results[0]
-                            latitude = result["latitude"]
-                            longitude = result["longitude"]
-                            place_name = result.get("name", candidate)
-                            break
+                    geo_url = f"https://geocoding-api.open-meteo.com/v1/search?name={urllib.parse.quote(cand)}&count=1&language=ru"
+                    async with session.get(geo_url, timeout=aiohttp.ClientTimeout(total=4)) as resp:
+                        if resp.status == 200:
+                            gdata = await resp.json()
+                            results = gdata.get("results")
+                            if results:
+                                lat = results[0]["latitude"]
+                                lon = results[0]["longitude"]
+                                place_name = results[0].get("name", cand)
+                                break
                 except Exception:
                     continue
 
-        if latitude is None or longitude is None:
+        if lat is None or lon is None:
             return None
 
         try:
-            async with session.get(
-                "https://api.open-meteo.com/v1/forecast",
-                params={
-                    "latitude": latitude,
-                    "longitude": longitude,
-                    "current": (
-                        "temperature_2m,apparent_temperature,relative_humidity_2m,"
-                        "wind_speed_10m,weather_code"
-                    ),
-                    "timezone": "auto",
-                },
-                timeout=timeout,
-            ) as response:
-                if response.status != 200:
-                    return None
-
-                data = await response.json()
-                current = data.get("current") or {}
-                temperature = current.get("temperature_2m")
-                if temperature is None:
-                    return None
-
-                description = WMO_WEATHER_CODES.get(
-                    current.get("weather_code", 0), "Переменная облачность"
-                )
-                fields = [f"{description}, температура {temperature}°C"]
-                if current.get("apparent_temperature") is not None:
-                    fields.append(f"ощущается как {current['apparent_temperature']}°C")
-                if current.get("wind_speed_10m") is not None:
-                    fields.append(f"ветер {current['wind_speed_10m']} км/ч")
-                if current.get("relative_humidity_2m") is not None:
-                    fields.append(f"влажность {current['relative_humidity_2m']}%")
-
-                return f"Погода в г. {place_name} прямо сейчас: {', '.join(fields)}."
+            w_url = (
+                f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}"
+                f"&current=temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,weather_code&timezone=auto"
+            )
+            async with session.get(w_url, timeout=aiohttp.ClientTimeout(total=4)) as resp:
+                if resp.status == 200:
+                    wdata = await resp.json()
+                    cur = wdata.get("current", {})
+                    temp = cur.get("temperature_2m")
+                    feels = cur.get("apparent_temperature")
+                    hum = cur.get("relative_humidity_2m")
+                    wind = cur.get("wind_speed_10m")
+                    code = cur.get("weather_code", 0)
+                    desc = WMO_WEATHER_CODES.get(code, "Переменная облачность")
+                    return (
+                        f"Погода в г. {place_name} прямо сейчас: {desc}, температура {temp}°C "
+                        f"(ощущается как {feels}°C), ветер {wind} км/ч, влажность {hum}%."
+                    )
         except Exception:
-            return None
+            pass
+        return None
 
     async def _fetch_currency_rates(self) -> Optional[str]:
         now = time.time()
-        if self._rates_cache and now - self._rates_cache[0] < RATES_CACHE_TTL_SECONDS:
+        if self._rates_cache and (now - self._rates_cache[0]) < RATES_CACHE_TTL_SECONDS:
             return self._rates_cache[1]
 
         session = await self._get_session()
-        timeout = aiohttp.ClientTimeout(total=4)
 
         async def get_cbr() -> Optional[str]:
             try:
-                async with session.get(
-                    "https://www.cbr-xml-daily.ru/daily_json.js", timeout=timeout
-                ) as response:
-                    if response.status != 200:
-                        return None
-
-                    data = json.loads(await response.text())
-                    currencies = data.get("Valute") or {}
-                    rates = []
-                    for code in ("USD", "EUR", "CNY", "KZT"):
-                        item = currencies.get(code) or {}
-                        nominal = item.get("Nominal")
-                        value = item.get("Value")
-                        if nominal and value is not None:
-                            rates.append(f"{nominal} {code} = {value:.2f} руб.")
-
-                    return f"Курс ЦБ РФ: {', '.join(rates)}." if rates else None
+                async with session.get("https://www.cbr-xml-daily.ru/daily_json.js", timeout=aiohttp.ClientTimeout(total=4)) as resp:
+                    if resp.status == 200:
+                        data = json.loads(await resp.text())
+                        val = data.get("Valute", {})
+                        usd = val.get("USD", {}).get("Value")
+                        eur = val.get("EUR", {}).get("Value")
+                        cny = val.get("CNY", {}).get("Value")
+                        kzt = val.get("KZT", {}).get("Value")
+                        if usd and eur:
+                            return (
+                                f"Курс ЦБ РФ: 1 USD = {usd:.2f} руб., 1 EUR = {eur:.2f} руб., "
+                                f"1 CNY = {cny:.2f} руб., 100 KZT = {kzt:.2f} руб."
+                            )
             except Exception:
-                return None
+                pass
+            return None
 
         async def get_crypto() -> Optional[str]:
             try:
-                async with session.get(
-                    "https://api.coingecko.com/api/v3/simple/price",
-                    params={
-                        "ids": "bitcoin,ethereum,the-open-network",
-                        "vs_currencies": "usd,rub",
-                    },
-                    timeout=timeout,
-                ) as response:
-                    if response.status != 200:
-                        return None
-
-                    data = await response.json()
-                    rates = []
-                    btc_usd = (data.get("bitcoin") or {}).get("usd")
-                    if btc_usd is not None:
-                        rates.append(f"BTC = ${btc_usd:,}")
-
-                    ton = data.get("the-open-network") or {}
-                    if ton.get("usd") is not None:
-                        rate = f"TON = ${ton['usd']}"
-                        if ton.get("rub") is not None:
-                            rate += f" ({ton['rub']} руб.)"
-                        rates.append(rate)
-
-                    return f"Криптовалюты: {', '.join(rates)}." if rates else None
+                cg_url = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,the-open-network&vs_currencies=usd,rub"
+                async with session.get(cg_url, timeout=aiohttp.ClientTimeout(total=4)) as resp:
+                    if resp.status == 200:
+                        cg = await resp.json()
+                        btc_usd = cg.get("bitcoin", {}).get("usd")
+                        ton_usd = cg.get("the-open-network", {}).get("usd")
+                        ton_rub = cg.get("the-open-network", {}).get("rub")
+                        if btc_usd:
+                            return f"Крипта: BTC = ${btc_usd:,}, TON = ${ton_usd} ({ton_rub} руб.)."
             except Exception:
-                return None
-
-        cbr, crypto = await asyncio.gather(get_cbr(), get_crypto())
-        lines = [line for line in (cbr, crypto) if line]
-        if not lines:
+                pass
             return None
 
-        result = "\n".join(lines)
-        self._rates_cache = (now, result)
-        return result
+        cbr_res, crypto_res = await asyncio.gather(get_cbr(), get_crypto())
+        lines = [line for line in (cbr_res, crypto_res) if line]
+        if lines:
+            result = "\n".join(lines)
+            self._rates_cache = (now, result)
+            return result
+        return None
 
     async def _fetch_web_search(self, query: str) -> Optional[str]:
-        clean_query = re.sub(
-            r"\b(?:загугли|найди в интернете|найди в инете|найди|поищи|"
-            r"расскажи про|что такое|кто такой)\b",
+        clean_q = re.sub(
+            r"\b(?:загугли|найди в интернете|найди в инете|найди|поищи|расскажи про|что такое|кто такой)\b",
             "",
             query,
             flags=re.IGNORECASE,
         ).strip()
-        if len(clean_query) < 2:
-            clean_query = query
-        clean_query = clean_query[:120]
+        if len(clean_q) < 2:
+            clean_q = query
 
         session = await self._get_session()
-        timeout = aiohttp.ClientTimeout(total=4)
 
         async def search_news() -> List[str]:
-            results = []
+            items_out = []
             try:
-                async with session.get(
-                    "https://news.google.com/rss/search",
-                    params={"q": clean_query, "hl": "ru", "gl": "RU", "ceid": "RU:ru"},
-                    timeout=timeout,
-                ) as response:
-                    if response.status == 200:
-                        xml = await response.text()
+                g_url = f"https://news.google.com/rss/search?q={urllib.parse.quote(clean_q[:120])}&hl=ru&gl=RU&ceid=RU:ru"
+                async with session.get(g_url, timeout=aiohttp.ClientTimeout(total=4)) as resp:
+                    if resp.status == 200:
+                        xml_text = await resp.text()
                         items = re.findall(
                             r"<item>.*?<title>(.*?)</title>.*?<pubDate>(.*?)</pubDate>.*?</item>",
-                            xml,
+                            xml_text,
                             flags=re.DOTALL,
                         )
                         for title, pub_date in items[:4]:
-                            title = html.unescape(re.sub(r"<[^>]+>", "", title)).strip()
-                            results.append(f"• Новость ({pub_date[:16]}): {title}")
+                            clean_title = html.unescape(re.sub(r"<[^>]+>", "", title)).strip()
+                            items_out.append(f"• Новость ({pub_date[:16]}): {clean_title}")
             except Exception:
                 pass
-            return results
+            return items_out
 
         async def search_wiki() -> List[str]:
-            results = []
+            items_out = []
             try:
-                async with session.get(
-                    "https://ru.wikipedia.org/w/api.php",
-                    params={
-                        "action": "query",
-                        "list": "search",
-                        "srsearch": clean_query,
-                        "utf8": 1,
-                        "format": "json",
-                        "srlimit": 3,
-                    },
-                    headers={"User-Agent": "MireiDiscordBot/2.0"},
-                    timeout=timeout,
-                ) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        for item in data.get("query", {}).get("search", [])[:3]:
-                            title = item.get("title", "")
-                            snippet = html.unescape(
-                                re.sub(r"<[^>]+>", "", item.get("snippet", ""))
-                            ).strip()
-                            if snippet:
-                                results.append(f"• Справка ({title}): {snippet}")
+                w_url = f"https://ru.wikipedia.org/w/api.php?action=query&list=search&srsearch={urllib.parse.quote(clean_q[:120])}&utf8=&format=json&srlimit=3"
+                headers = {"User-Agent": "MireiDiscordBot/2.0"}
+                async with session.get(w_url, headers=headers, timeout=aiohttp.ClientTimeout(total=4)) as resp:
+                    if resp.status == 200:
+                        wdata = await resp.json()
+                        for item in wdata.get("query", {}).get("search", [])[:3]:
+                            t = item.get("title", "")
+                            snip = html.unescape(re.sub(r"<[^>]+>", "", item.get("snippet", ""))).strip()
+                            if snip:
+                                items_out.append(f"• Справка ({t}): {snip}")
             except Exception:
                 pass
-            return results
+            return items_out
 
-        news, wiki = await asyncio.gather(search_news(), search_wiki())
-        results = news + wiki
+        news_res, wiki_res = await asyncio.gather(search_news(), search_wiki())
+        results = news_res + wiki_res
         return "\n".join(results) if results else None
 
     async def _gather_internet_context(self, raw_user_text: str) -> str:
-        text = raw_user_text.lower()
+        low = raw_user_text.lower()
         blocks = []
 
-        weather_triggers = ("погод", "градус", "температур", "дождь в", "снег в", "метео")
-        if any(word in text for word in weather_triggers):
-            weather = await self._fetch_weather(raw_user_text)
-            if weather:
-                blocks.append(weather)
+        if any(w in low for w in ("погод", "градус", "температур", "дождь в", "снег в", "метео")):
+            weather_info = await self._fetch_weather(raw_user_text)
+            if weather_info:
+                blocks.append(weather_info)
 
-        currency_triggers = (
-            "курс", "доллар", "евро", "рубл", "юан", "тенге",
-            "биткоин", "btc", "крипт", "ton ",
-        )
-        if any(word in text for word in currency_triggers):
-            rates = await self._fetch_currency_rates()
-            if rates:
-                blocks.append(rates)
+        if any(w in low for w in ("курс", "доллар", "евро", "рубл", "юан", "тенге", "биткоин", "btc", "крипт", "ton ")):
+            rates_info = await self._fetch_currency_rates()
+            if rates_info:
+                blocks.append(rates_info)
 
-        year = datetime.datetime.now().year
+        cur_year = datetime.datetime.now().year
         search_triggers = (
-            "загугли", "найди", "поищи", "новости", "когда выйдет",
-            "когда вышел", "кто выиграл", "что случилось", "кто такой",
-            "что такое", "актуальн", f"в {year}", f"в {year - 1}", f"в {year + 1}",
+            "загугли", "найди", "поищи", "новости", "когда выйдет", "когда вышел",
+            "кто выиграл", "что случилось", "кто такой", "что такое", "актуальн",
+            f"в {cur_year}", f"в {cur_year - 1}", f"в {cur_year + 1}"
         )
-        if not blocks and any(word in text for word in search_triggers):
-            search = await self._fetch_web_search(raw_user_text)
-            if search:
-                blocks.append(search)
+        if any(w in low for w in search_triggers) and not blocks:
+            web_info = await self._fetch_web_search(raw_user_text)
+            if web_info:
+                blocks.append(web_info)
 
         if not blocks:
             return ""
@@ -1392,89 +1152,78 @@ class AIChat(commands.Cog):
         if not self._gemini_models_verified:
             await self._verify_gemini_models()
 
-        contents = [
-            {
-                "role": "model" if message["role"] == "assistant" else "user",
-                "parts": [{"text": message["content"]}],
-            }
-            for message in history
-        ]
+        contents = []
+        for msg in history:
+            role = "model" if msg["role"] == "assistant" else "user"
+            contents.append({"role": role, "parts": [{"text": msg["content"]}]})
+
         user_parts: List[dict] = [{"text": current_msg}]
         if image_data:
-            mime_type, image_base64 = image_data
-            user_parts.append(
-                {"inlineData": {"mimeType": mime_type, "data": image_base64}}
-            )
+            mime_type, b64_str = image_data
+            user_parts.append({"inlineData": {"mimeType": mime_type, "data": b64_str}})
+
         contents.append({"role": "user", "parts": user_parts})
 
         headers = {
             "Content-Type": "application/json",
             "x-goog-api-key": self.gemini_key,
         }
-        timeout = aiohttp.ClientTimeout(total=13 if image_data else 9)
+        req_timeout = aiohttp.ClientTimeout(total=13 if image_data else 9)
         session = await self._get_session()
 
-        for model in self.gemini_models:
-            model_key = f"gemini:{model}"
-            if not self._is_model_available(model_key):
+        for model_name in self.gemini_models:
+            ban_key = f"gemini:{model_name}"
+            if not self._is_model_available(ban_key):
                 continue
 
-            generation: Dict[str, Any] = {
+            gen_config: Dict[str, Any] = {
                 "temperature": 0.85,
                 "maxOutputTokens": 800,
             }
-            if "3.8" in model:
-                generation["thinkingConfig"] = {"thinkingLevel": "low"}
-            elif model.startswith("gemini-3"):
-                generation["thinkingConfig"] = {"thinkingLevel": "minimal"}
+            if "3.8" in model_name:
+                gen_config["thinkingConfig"] = {"thinkingLevel": "low"}
+            elif model_name.startswith("gemini-3"):
+                gen_config["thinkingConfig"] = {"thinkingLevel": "minimal"}
 
-            payload = {
+            payload: Dict[str, Any] = {
                 "systemInstruction": {"parts": [{"text": system_prompt}]},
                 "contents": contents,
                 "safetySettings": SAFETY_SETTINGS_MODERATE,
-                "generationConfig": generation,
+                "generationConfig": gen_config,
             }
-            url = (
-                "https://generativelanguage.googleapis.com/v1beta/"
-                f"models/{model}:generateContent"
-            )
 
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent"
             try:
-                async with session.post(
-                    url, json=payload, headers=headers, timeout=timeout
-                ) as response:
-                    if response.status == 200:
-                        data = await response.json()
+                async with session.post(url, json=payload, headers=headers, timeout=req_timeout) as resp:
+                    if resp.status == 200:
+                        data = await resp.json()
                         candidates = data.get("candidates") or []
                         if not candidates:
-                            return (
-                                "🛡️ Ответ не получен. "
-                                "Попробуй переформулировать запрос."
-                            )
-
-                        parts = (candidates[0].get("content") or {}).get("parts") or []
-                        reply = "".join(
-                            part.get("text", "")
-                            for part in parts
-                            if "text" in part and not part.get("thought")
-                        ).strip()
+                            return "🛡️ Фильтр безопасности заблокировал этот запрос — попробуй сформулировать помягче."
+                        parts = candidates[0].get("content", {}).get("parts", [])
+                        reply = "".join(p.get("text", "") for p in parts if "text" in p and not p.get("thought")).strip()
+                        if not reply and parts:
+                            reply = parts[-1].get("text", "").strip()
                         if reply:
                             return reply
-
-                    elif response.status == 404:
-                        log.warning("Gemini: модель %s не найдена (404)", model)
-                        self._ban_model(model_key, MODEL_COOLDOWN_NOT_FOUND)
-
+                    elif resp.status == 404:
+                        err = await resp.text()
+                        log.warning("Gemini модель %s не найдена (404), пропускаем на 1 ч: %s", model_name, err[:150])
+                        self._ban_model(ban_key, MODEL_COOLDOWN_NOT_FOUND)
+                    elif resp.status in (429, 500, 503):
+                        err = await resp.text()
+                        log.warning("Gemini %s вернула %s, пауза 5 мин: %s", model_name, resp.status, err[:150])
+                        self._ban_model(ban_key, MODEL_COOLDOWN_TEMP)
                     else:
-                        log.warning("Gemini: модель %s вернула HTTP %s", model, response.status)
-                        self._ban_model(model_key, MODEL_COOLDOWN_TEMP)
-
+                        err = await resp.text()
+                        log.warning("Gemini %s ошибка %s: %s", model_name, resp.status, err[:200])
+                        self._ban_model(ban_key, MODEL_COOLDOWN_TEMP)
             except asyncio.TimeoutError:
-                log.warning("Таймаут Gemini: %s", model)
-                self._ban_model(model_key, MODEL_COOLDOWN_TEMP)
-            except Exception as error:
-                log.warning("Сбой запроса Gemini %s: %s", model, error)
-                self._ban_model(model_key, MODEL_COOLDOWN_TEMP)
+                log.warning("Таймаут Gemini %s, пауза 5 мин.", model_name)
+                self._ban_model(ban_key, MODEL_COOLDOWN_TEMP)
+            except Exception as e:
+                log.warning("Сбой запроса Gemini %s: %s", model_name, e)
+                self._ban_model(ban_key, MODEL_COOLDOWN_TEMP)
 
         return None
 
@@ -1485,69 +1234,61 @@ class AIChat(commands.Cog):
         history: deque,
         current_msg: str,
     ) -> Optional[str]:
-        provider = OPENAI_PROVIDERS.get(provider_name)
+        meta = OPENAI_PROVIDERS.get(provider_name)
         api_key = self.provider_keys.get(provider_name)
-        if not provider or not api_key:
+        if not meta or not api_key:
             return None
 
-        messages: List[Dict[str, Any]] = [
-            {"role": "system", "content": system_prompt}
-        ]
-        messages.extend(
-            {"role": message["role"], "content": message["content"]}
-            for message in history
-        )
+        messages: List[Dict[str, Any]] = [{"role": "system", "content": system_prompt}]
+        for msg in history:
+            messages.append({"role": msg["role"], "content": msg["content"]})
         messages.append({"role": "user", "content": current_msg})
 
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {api_key}",
         }
+        req_timeout = aiohttp.ClientTimeout(total=9)
         session = await self._get_session()
-        timeout = aiohttp.ClientTimeout(total=9)
 
-        for model in provider["models"]:
-            model_key = f"{provider_name}:{model}"
-            if not self._is_model_available(model_key):
+        for model_name in meta["models"]:
+            ban_key = f"{provider_name}:{model_name}"
+            if not self._is_model_available(ban_key):
                 continue
 
             payload = {
-                "model": model,
+                "model": model_name,
                 "messages": messages,
                 "temperature": 0.85,
                 "max_tokens": MAX_OUTPUT_TOKENS,
             }
-
             try:
-                async with session.post(
-                    provider["url"], json=payload, headers=headers, timeout=timeout
-                ) as response:
-                    if response.status == 200:
-                        data = await response.json()
+                async with session.post(meta["url"], json=payload, headers=headers, timeout=req_timeout) as resp:
+                    if resp.status == 200:
+                        try:
+                            data = await resp.json()
+                        except Exception:
+                            log.warning("Провайдер %s (%s) вернул не-JSON ответ.", provider_name, model_name)
+                            self._ban_model(ban_key, MODEL_COOLDOWN_TEMP)
+                            continue
                         choices = data.get("choices") or []
                         if choices:
-                            message = choices[0].get("message") or {}
-                            content = message.get("content")
-                            if isinstance(content, str) and content.strip():
-                                return content.strip()
-
-                    elif response.status == 404:
-                        log.warning("%s: модель %s не найдена (404)", provider_name, model)
-                        self._ban_model(model_key, MODEL_COOLDOWN_NOT_FOUND)
-
+                            reply = (choices[0].get("message", {}).get("content") or "").strip()
+                            if reply:
+                                return reply
+                    elif resp.status == 404:
+                        log.warning("%s (%s) вернул 404, пауза 1 ч.", provider_name, model_name)
+                        self._ban_model(ban_key, MODEL_COOLDOWN_NOT_FOUND)
                     else:
-                        log.warning(
-                            "%s: модель %s вернула HTTP %s",
-                            provider_name, model, response.status,
-                        )
-                        self._ban_model(model_key, MODEL_COOLDOWN_TEMP)
-
+                        err = await resp.text()
+                        log.warning("%s (%s) вернул %s: %s", provider_name, model_name, resp.status, err[:150])
+                        self._ban_model(ban_key, MODEL_COOLDOWN_TEMP)
             except asyncio.TimeoutError:
-                log.warning("Таймаут %s: %s", provider_name, model)
-                self._ban_model(model_key, MODEL_COOLDOWN_TEMP)
-            except Exception as error:
-                log.warning("Ошибка %s (%s): %s", provider_name, model, error)
-                self._ban_model(model_key, MODEL_COOLDOWN_TEMP)
+                log.warning("Таймаут %s (%s), пауза 5 мин.", provider_name, model_name)
+                self._ban_model(ban_key, MODEL_COOLDOWN_TEMP)
+            except Exception as e:
+                log.warning("Ошибка %s (%s): %s", provider_name, model_name, e)
+                self._ban_model(ban_key, MODEL_COOLDOWN_TEMP)
 
         return None
 
@@ -1562,408 +1303,350 @@ class AIChat(commands.Cog):
         embed_img_url: Optional[str],
         is_spontaneous: bool,
     ) -> Optional[str]:
+        guild_id = guild.id if guild else 0
         channel_id = getattr(channel, "id", 0)
         history = self._get_channel_history(channel_id)
-        config = await self.get_ai_config(guild.id) if guild else {}
+
+        cfg = await self.get_ai_config(guild_id) if guild else {}
 
         async def empty_none():
             return None
 
-        async def empty_text():
+        async def empty_str():
             return ""
 
-        knowledge_request = self._build_guild_knowledge(guild, channel, config)
-        identity_request = self._get_author_identity_tag(author, guild)
-        internet_request = (
-            empty_text()
-            if is_spontaneous
-            else self._gather_internet_context(raw_user_text)
-        )
-        image_request = (
+        guild_knowledge_coro = self._build_guild_knowledge(guild, channel, cfg)
+        identity_coro = self._get_author_identity_tag(author, guild)
+        internet_coro = empty_str() if is_spontaneous else self._gather_internet_context(raw_user_text)
+        image_coro = (
             self._download_image_base64(attachment, embed_img_url)
-            if attachment or embed_img_url
-            else empty_none()
+            if (attachment or embed_img_url) else empty_none()
         )
 
-        guild_knowledge, identity, internet_context, image_data = await asyncio.gather(
-            knowledge_request,
-            identity_request,
-            internet_request,
-            image_request,
+        guild_knowledge, identity_tag, internet_context, image_data = await asyncio.gather(
+            guild_knowledge_coro, identity_coro, internet_coro, image_coro,
         )
 
         base_prompt = PROMPT_CHARACTER_BASE
         if not is_spontaneous and self._has_any_mod_permission(author, guild):
             base_prompt += PROMPT_MODERATION_ADDON
 
-        scenario = config.get("aiCustomScenario")
-        if scenario:
-            base_prompt += f"\n\nДОПОЛНИТЕЛЬНЫЙ СЦЕНАРИЙ СЕРВЕРА:\n{scenario[:800]}"
+        custom_scenario = cfg.get("aiCustomScenario")
+        if custom_scenario:
+            base_prompt += f"\n\nДОПОЛНИТЕЛЬНЫЙ СЦЕНАРИЙ ЭТОГО СЕРВЕРА:\n{custom_scenario[:800]}"
 
         if is_spontaneous:
             base_prompt += (
-                "\n\n[КОНТЕКСТ: Ты решила поддержать беседу без упоминания. "
-                "Ответь в 1–2 предложениях и не используй теги ACTION.]"
+                "\n\n[КОНТЕКСТ: Тебя сейчас не тегали, ты сама решила по-дружески поддержать беседу. "
+                "Ответь коротко в тему (1–2 предложения) и НЕ используй теги ACTION.]"
             )
 
-        capabilities = (
-            "" if is_spontaneous else self._build_bot_capabilities(raw_user_text)
-        )
+        bot_capabilities = "" if is_spontaneous else self._build_bot_capabilities(raw_user_text)
 
-        moscow_tz = datetime.timezone(datetime.timedelta(hours=3))
-        now = datetime.datetime.now(moscow_tz)
-        time_info = now.strftime(f"{WEEKDAYS_RU[now.weekday()]}, %d.%m.%Y, %H:%M (МСК)")
+        msk_tz = datetime.timezone(datetime.timedelta(hours=3))
+        now_msk = datetime.datetime.now(msk_tz)
+        time_info = now_msk.strftime(f"{WEEKDAYS_RU[now_msk.weekday()]}, %d.%m.%Y, %H:%M (МСК)")
 
-        system_prompt = (
+        active_prompt = (
             f"{base_prompt}\n"
             f"{guild_knowledge}"
-            f"{capabilities}\n"
+            f"{bot_capabilities}\n"
             f"Текущее время и дата: {time_info}."
             f"{internet_context}"
         )
 
-        author_label = f"{author.display_name} (ID: {author.id})"
-        current_message = (
-            f"{identity}\n{author_label}: {user_text}"
-            if identity
-            else f"{author_label}: {user_text}"
-        )
+        author_header = f"{author.display_name} (ID: {author.id})"
+        current_msg = f"{identity_tag}\n{author_header}: {user_text}".strip() if identity_tag else f"{author_header}: {user_text}"
 
-        providers: List[str] = []
+        available_providers: List[str] = []
         if self.gemini_key:
-            providers.append("gemini")
-        providers.extend(
-            name for name in OPENAI_PROVIDERS if self.provider_keys.get(name)
-        )
+            available_providers.append("gemini")
+        for p_name in OPENAI_PROVIDERS:
+            if self.provider_keys.get(p_name):
+                available_providers.append(p_name)
 
-        preferred = config.get("aiProvider") or "auto"
-        if preferred in providers:
-            providers.remove(preferred)
-            providers.insert(0, preferred)
+        preferred = cfg.get("aiProvider") or "auto"
+        if preferred in available_providers:
+            available_providers.remove(preferred)
+            available_providers.insert(0, preferred)
 
         reply: Optional[str] = None
-        for provider in providers:
-            if provider == "gemini":
-                reply = await self._call_gemini(
-                    system_prompt, history, current_message, image_data
-                )
+        for provider_name in available_providers:
+            if provider_name == "gemini":
+                reply = await self._call_gemini(active_prompt, history, current_msg, image_data)
             elif not image_data:
-                reply = await self._call_openai_provider(
-                    provider, system_prompt, history, current_message
-                )
+                reply = await self._call_openai_provider(provider_name, active_prompt, history, current_msg)
             if reply:
                 break
 
-        if not reply:
-            return None
+        if reply:
+            # При автоответе реплика уже добавлена в историю обработчиком on_message.
+            if not is_spontaneous:
+                history_text = f"{author.display_name}: {user_text} [Изображение]" if image_data else f"{author.display_name}: {user_text}"
+                history.append({"role": "user", "content": history_text})
+            history.append({"role": "assistant", "content": reply})
+            self._memory_last_active[channel_id] = time.time()
+            return reply
 
-        if not is_spontaneous:
-            suffix = " [Изображение]" if image_data else ""
-            history.append(
-                {"role": "user", "content": f"{author.display_name}: {user_text}{suffix}"}
-            )
-
-        history.append({"role": "assistant", "content": reply})
-        self._memory_last_active[channel_id] = time.time()
-        return reply
+        return None
 
     async def _ask_llm(self, **kwargs) -> Optional[str]:
         try:
-            return await asyncio.wait_for(
-                self._ask_llm_inner(**kwargs), timeout=TOTAL_LLM_TIMEOUT
-            )
+            return await asyncio.wait_for(self._ask_llm_inner(**kwargs), timeout=TOTAL_LLM_TIMEOUT)
         except asyncio.TimeoutError:
-            log.warning("Превышен общий таймаут ИИ (%s сек).", TOTAL_LLM_TIMEOUT)
+            log.warning("Общий таймаут _ask_llm (%s сек) превышен.", TOTAL_LLM_TIMEOUT)
             return None
+
     @staticmethod
-    def _is_ignored_chat_channel(
-        channel: disnake.abc.GuildChannel, guild: disnake.Guild
-    ) -> bool:
+    def _is_ignored_chat_channel(channel: disnake.abc.GuildChannel, guild: disnake.Guild) -> bool:
         if guild.rules_channel and channel.id == guild.rules_channel.id:
             return True
-
-        name = getattr(channel, "name", "").lower()
-        ignored_words = (
-            "правил", "rules", "логи", "logs", "audit", "аудит",
-            "админ", "admin", "модер", "moder", "тикет", "ticket",
-        )
-        return any(word in name for word in ignored_words)
+        name_low = getattr(channel, "name", "").lower()
+        ignored_words = ("правил", "rules", "логи", "logs", "audit", "аудит", "админ", "admin", "модер", "moder", "тикет", "ticket")
+        return any(w in name_low for w in ignored_words)
 
     def _check_dm_limit(self, user_id: int) -> bool:
         if user_id in self.creator_ids:
             return True
-
         today = datetime.date.today().isoformat()
-        previous_day, count = self._dm_daily_usage.get(user_id, (today, 0))
-        if previous_day != today:
+        day_str, count = self._dm_daily_usage.get(user_id, (today, 0))
+        if day_str != today:
             count = 0
         if count >= DM_DAILY_LIMIT:
             return False
-
         if len(self._dm_daily_usage) > 2000:
-            self._dm_daily_usage = {
-                key: value
-                for key, value in self._dm_daily_usage.items()
-                if value[0] == today
-            }
-
+            self._dm_daily_usage = {u: v for u, v in self._dm_daily_usage.items() if v[0] == today}
         self._dm_daily_usage[user_id] = (today, count + 1)
         return True
 
     @commands.Cog.listener()
     async def on_message(self, message: disnake.Message):
-        bot_user = self.bot.user
-        if message.author.bot or bot_user is None:
+        if message.author.bot or self.bot.user is None:
             return
 
-        guild = message.guild
-        is_dm = guild is None
-        is_spontaneous = False
+        if message.guild is not None:
+            automod = self.bot.get_cog("AutoModeration")
+            check_message = getattr(automod, "check_message", None)
+            if check_message is not None and await check_message(message):
+                return
+
+        is_dm = message.guild is None
         ref_msg: Optional[disnake.Message] = None
-        now = time.time()
 
         if message.reference and message.reference.message_id:
-            resolved = message.reference.resolved
-            if isinstance(resolved, disnake.Message):
-                ref_msg = resolved
-            else:
+            ref_msg = message.reference.resolved if isinstance(message.reference.resolved, disnake.Message) else None
+            if ref_msg is None:
                 try:
-                    ref_msg = await message.channel.fetch_message(
-                        message.reference.message_id
-                    )
+                    ref_msg = await message.channel.fetch_message(message.reference.message_id)
                 except disnake.HTTPException:
-                    pass
+                    ref_msg = None
+
+        is_spontaneous = False
+        now = time.time()
 
         if is_dm:
             await self._ensure_creator_id()
             if not self._check_dm_limit(message.author.id):
                 await message.reply(
-                    f"⏳ Дневной лимит сообщений в ЛС исчерпан "
-                    f"({DM_DAILY_LIMIT}/{DM_DAILY_LIMIT}). Приходи завтра!",
+                    f"⏳ Дневной лимит сообщений в ЛС исчерпан ({DM_DAILY_LIMIT}/{DM_DAILY_LIMIT}). Приходи завтра или общайся на сервере!",
                     mention_author=False,
                     allowed_mentions=SAFE_MENTIONS,
                 )
                 return
-
         else:
-            config = await self.get_ai_config(guild.id)
-            trap_channel_id = config.get("trapChannelId")
-            if trap_channel_id and str(message.channel.id) == str(trap_channel_id):
+            cfg = await self.get_ai_config(message.guild.id)
+            if cfg.get("trapChannelId") and str(message.channel.id) == str(cfg["trapChannelId"]):
                 return
-            if config.get("aiEnabled", True) is False:
+            if cfg.get("aiEnabled", True) is False:
                 return
 
-            is_mentioned = bot_user in message.mentions
-            is_reply_to_bot = ref_msg is not None and ref_msg.author.id == bot_user.id
+            is_mentioned = self.bot.user in message.mentions
+            is_reply_to_bot = bool(ref_msg and ref_msg.author.id == self.bot.user.id)
 
             if not (is_mentioned or is_reply_to_bot):
-                if (
-                    not message.content
-                    or message.content.startswith(("/", "!", "."))
-                    or self._is_ignored_chat_channel(message.channel, guild)
-                ):
+                if message.content and not message.content.startswith(("/", "!", ".")) and not self._is_ignored_chat_channel(message.channel, message.guild):
+                    history = self._get_channel_history(message.channel.id)
+                    history.append({"role": "user", "content": f"{message.author.display_name}: {message.content[:400]}"})
+
+                    chance = int(cfg.get("aiAutoReplyChance") or 0)
+                    last_auto = self._channel_auto_cooldowns.get(message.channel.id, 0.0)
+                    if (
+                        chance > 0
+                        and len(message.content.strip()) >= 8
+                        and (now - last_auto) >= AUTO_REPLY_CHANNEL_COOLDOWN
+                        and random.randint(1, 100) <= chance
+                    ):
+                        is_spontaneous = True
+                        if len(self._channel_auto_cooldowns) > 2000:
+                            self._channel_auto_cooldowns = {
+                                cid: ts for cid, ts in self._channel_auto_cooldowns.items()
+                                if (now - ts) < AUTO_REPLY_CHANNEL_COOLDOWN
+                            }
+                        self._channel_auto_cooldowns[message.channel.id] = now
+                    else:
+                        return
+                else:
                     return
-
-                history = self._get_channel_history(message.channel.id)
-                history.append(
-                    {
-                        "role": "user",
-                        "content": f"{message.author.display_name}: {message.content[:400]}",
-                    }
-                )
-
-                chance = int(config.get("aiAutoReplyChance") or 0)
-                last_auto = self._channel_auto_cooldowns.get(message.channel.id, 0.0)
-                if (
-                    chance <= 0
-                    or len(message.content.strip()) < 8
-                    or now - last_auto < AUTO_REPLY_CHANNEL_COOLDOWN
-                    or random.randint(1, 100) > chance
-                ):
-                    return
-
-                is_spontaneous = True
-                if len(self._channel_auto_cooldowns) > 2000:
-                    self._channel_auto_cooldowns = {
-                        channel_id: timestamp
-                        for channel_id, timestamp in self._channel_auto_cooldowns.items()
-                        if now - timestamp < AUTO_REPLY_CHANNEL_COOLDOWN
-                    }
-                self._channel_auto_cooldowns[message.channel.id] = now
 
         if not is_spontaneous:
             last_used = self.cooldowns.get(message.author.id, 0.0)
             if now - last_used < self.cooldown_seconds:
                 return
-
             if len(self.cooldowns) > 2000:
-                self.cooldowns = {
-                    user_id: timestamp
-                    for user_id, timestamp in self.cooldowns.items()
-                    if now - timestamp < 60.0
-                }
+                self.cooldowns = {uid: ts for uid, ts in self.cooldowns.items() if (now - ts) < 60.0}
             self.cooldowns[message.author.id] = now
 
+        # Для поиска нужен текст реплики без цитат и содержимого Embed.
         raw_user_text = message.content
-        for mention in (f"<@{bot_user.id}>", f"<@!{bot_user.id}>"):
-            raw_user_text = raw_user_text.replace(mention, "")
+        for mention_str in (f"<@{self.bot.user.id}>", f"<@!{self.bot.user.id}>"):
+            raw_user_text = raw_user_text.replace(mention_str, "")
         raw_user_text = raw_user_text.strip()
 
         clean_text = raw_user_text
         if message.embeds:
-            embed_text = self._extract_embeds_text(message.embeds)
-            if embed_text:
-                clean_text = f"{clean_text}\n{embed_text}".strip()
+            emb_text = self._extract_embeds_text(message.embeds)
+            if emb_text:
+                clean_text = f"{clean_text}\n{emb_text}".strip()
 
         if ref_msg:
-            quoted_parts = []
+            ref_parts = []
             if ref_msg.content:
-                quoted_parts.append(ref_msg.content[:600])
+                ref_parts.append(ref_msg.content[:600])
             if ref_msg.embeds:
-                quoted_parts.append(self._extract_embeds_text(ref_msg.embeds))
-
-            if quoted_parts:
-                quote = " | ".join(quoted_parts)
+                ref_parts.append(self._extract_embeds_text(ref_msg.embeds))
+            if ref_parts:
+                quoted_combined = " | ".join(ref_parts)
                 clean_text = (
-                    f"(В ответ на сообщение от {ref_msg.author.display_name} "
-                    f"[ID: {ref_msg.author.id}]: «{quote}») {clean_text}"
+                    f"(В ответ на сообщение от {ref_msg.author.display_name} [ID: {ref_msg.author.id}]: "
+                    f"«{quoted_combined}») {clean_text}"
                 ).strip()
 
-        attachment: Optional[disnake.Attachment] = None
-        embed_image_url: Optional[str] = None
+        target_attachment: Optional[disnake.Attachment] = None
+        target_embed_img_url: Optional[str] = None
 
         if message.attachments:
-            attachment = message.attachments[0]
+            target_attachment = message.attachments[0]
         elif ref_msg and ref_msg.attachments:
-            attachment = ref_msg.attachments[0]
-        else:
-            embed_image_url = self._extract_embed_image_url(message.embeds)
-            if not embed_image_url and ref_msg:
-                embed_image_url = self._extract_embed_image_url(ref_msg.embeds)
+            target_attachment = ref_msg.attachments[0]
+        elif message.embeds:
+            target_embed_img_url = self._extract_embed_image_url(message.embeds)
+        elif ref_msg and ref_msg.embeds:
+            target_embed_img_url = self._extract_embed_image_url(ref_msg.embeds)
 
-        if not clean_text:
-            if not attachment and not embed_image_url:
-                if not is_spontaneous:
-                    await message.reply(
-                        "💠 Я тут, чего звал?",
-                        mention_author=False,
-                        allowed_mentions=SAFE_MENTIONS,
-                    )
-                return
+        if not clean_text and not target_attachment and not target_embed_img_url:
+            if not is_spontaneous:
+                await message.reply("💠 Я тут, чего звал?", mention_author=False, allowed_mentions=SAFE_MENTIONS)
+            return
 
+        if not clean_text and (target_attachment or target_embed_img_url):
             clean_text = "Посмотри на это изображение и прокомментируй его!"
             raw_user_text = clean_text
 
         async with message.channel.typing():
-            reply = await self._ask_llm(
-                guild=guild,
+            reply_text = await self._ask_llm(
+                guild=message.guild,
                 channel=message.channel,
                 author=message.author,
                 user_text=clean_text[:1500],
                 raw_user_text=raw_user_text[:500],
-                attachment=attachment,
-                embed_img_url=embed_image_url,
+                attachment=target_attachment,
+                embed_img_url=target_embed_img_url,
                 is_spontaneous=is_spontaneous,
             )
 
-        if not reply:
-            if not is_spontaneous:
-                await message.reply(
-                    "⚠️ Нейросеть временно недоступна. Попробуй чуть позже.",
-                    mention_author=False,
-                    allowed_mentions=SAFE_MENTIONS,
-                )
-            return
-
-        reaction = re.search(r"\[REACT:\s*([^\]]+)\]", reply)
-        if reaction:
-            emoji = reaction.group(1).strip()
-            reply = re.sub(r"\[REACT:\s*[^\]]+\]", "", reply).strip()
-            if emoji:
+        if reply_text:
+            react_match = re.search(r"\[REACT:\s*([^\]]+)\]", reply_text)
+            if react_match:
+                emoji_str = react_match.group(1).strip()
+                reply_text = re.sub(r"\[REACT:\s*[^\]]+\]", "", reply_text).strip()
                 try:
-                    await message.add_reaction(emoji)
-                except (disnake.HTTPException, TypeError, ValueError):
+                    await message.add_reaction(emoji_str)
+                except disnake.HTTPException:
                     pass
 
-        action_status = ""
-        confirm_view: Optional[disnake.ui.View] = None
-        action = re.search(r"\[ACTION:\s*([^\]]+)\]", reply)
-        if action:
-            reply = re.sub(r"\[ACTION:\s*[^\]]+\]", "", reply).strip()
-            if not is_spontaneous:
-                action_status, confirm_view = await self._execute_ai_action(
-                    message, ref_msg, action.group(1).strip()
-                )
+            action_status = ""
+            confirm_view: Optional[disnake.ui.View] = None
 
-        if action_status:
-            reply = f"{reply}\n\n{action_status}".strip()
-        if not reply:
-            return
+            action_match = re.search(r"\[ACTION:\s*([^\]]+)\]", reply_text)
+            if action_match:
+                raw_action = action_match.group(1).strip()
+                reply_text = re.sub(r"\[ACTION:\s*[^\]]+\]", "", reply_text).strip()
+                if not is_spontaneous:
+                    action_status, confirm_view = await self._execute_ai_action(message, ref_msg, raw_action)
 
-        send_kwargs: Dict[str, Any] = {"allowed_mentions": SAFE_MENTIONS}
-        if confirm_view is not None:
-            send_kwargs["view"] = confirm_view
+            final_output = f"{reply_text}\n\n{action_status}".strip() if action_status else reply_text
+            if final_output:
+                send_kwargs: Dict[str, Any] = {"allowed_mentions": SAFE_MENTIONS}
+                if confirm_view is not None:
+                    send_kwargs["view"] = confirm_view
 
-        try:
-            await message.reply(reply[:2000], mention_author=False, **send_kwargs)
-        except disnake.HTTPException:
-            await message.channel.send(reply[:2000], **send_kwargs)
+                try:
+                    await message.reply(final_output[:2000], mention_author=False, **send_kwargs)
+                except disnake.HTTPException:
+                    await message.channel.send(final_output[:2000], **send_kwargs)
+        elif not is_spontaneous:
+            await message.reply(
+                "⚠️ Модули нейросети временно недоступны, попробуй чуть позже.",
+                mention_author=False,
+                allowed_mentions=SAFE_MENTIONS,
+            )
 
     @commands.slash_command(
         contexts=GUILD_ONLY,
-        name="ai",
-        description="Управление ИИ Mirei",
+        name="ии",
+        description="💠 Управление ИИ Mirei (Только для администраторов)",
     )
     @commands.default_member_permissions(administrator=True)
     async def ai_control_panel(
         self,
         inter: disnake.ApplicationCommandInteraction,
         model: Optional[str] = commands.Param(
+            name="провайдер",
             default=None,
             choices={
-                "🔄 Авто-выбор": "auto",
+                "🔄 Авто-выбор (Все доступные)": "auto",
                 "✨ Google Gemini": "gemini",
                 "⚡ Groq (Llama 3.3 70B)": "groq",
                 "🌐 OpenRouter Free": "openrouter",
                 "🌪️ Mistral AI": "mistral",
             },
-            description="Предпочитаемый провайдер",
+            description="Быстро сменить модель нейросети",
         ),
         auto_reply_chance: Optional[int] = commands.Param(
+            name="шанс_автоответа",
             default=None,
-            description="Шанс случайного ответа в обычном чате",
+            description="Шанс случайного ответа в обычный чат (0-100%, 0 = выкл)",
             ge=0,
             le=100,
         ),
         enabled: Optional[bool] = commands.Param(
+            name="включён",
             default=None,
-            description="Включить или выключить ИИ на сервере",
+            description="Включить (True) или выключить (False) ИИ на сервере",
         ),
         reset_memory: bool = commands.Param(
+            name="сбросить_память",
             default=False,
-            description="Очистить память диалога в текущем канале",
+            description="Очистить память диалога в текущем канале?",
         ),
     ):
         await inter.response.defer(ephemeral=True)
         await self._ensure_creator_id()
-        if (
-            not inter.author.guild_permissions.administrator
-            and inter.author.id not in self.creator_ids
-        ):
+        if not inter.author.guild_permissions.administrator and inter.author.id not in self.creator_ids:
             await inter.edit_original_response(
-                content="⛔ Управлять ИИ могут администраторы сервера."
+                content="⛔ Доступ запрещен: управлять модулем ИИ могут только администраторы сервера.",
             )
             return
 
         if model and model != "auto":
-            has_key = self.gemini_key if model == "gemini" else self.provider_keys.get(model)
+            has_key = bool(self.gemini_key) if model == "gemini" else bool(self.provider_keys.get(model))
             if not has_key:
                 await inter.edit_original_response(
-                    content=f"⚠️ Для провайдера `{model}` отсутствует API-ключ в `.env`."
+                    content=f"⚠️ Провайдер **`{model}`** не подключён на сервере (не задан API-ключ в `.env`).",
                 )
                 return
 
-        updates: Dict[str, Any] = {}
+        updates = {}
         if model is not None:
             updates["aiProvider"] = model
         if auto_reply_chance is not None:
@@ -1973,14 +1656,15 @@ class AIChat(commands.Cog):
         if reset_memory:
             self._clear_channel_memory(inter.channel_id)
 
-        saved = not updates or await self.update_ai_config(inter.guild_id, **updates)
-        config = await self.get_ai_config(inter.guild_id)
-        view = AIControlPanelView(
-            self, inter.author.id, inter.guild_id, inter.channel_id, config
-        )
+        saved = True
+        if updates:
+            saved = await self.update_ai_config(inter.guild_id, **updates)
+
+        cfg = await self.get_ai_config(inter.guild_id)
+        view = AIControlPanelView(self, inter.author.id, inter.guild_id, inter.channel_id, cfg)
         embed = await view.build_embed(inter.guild)
-        warning = None if saved else "⚠️ Не удалось сохранить настройки в БД."
-        await inter.edit_original_response(content=warning, embed=embed, view=view)
+        warn = None if saved else "⚠️ Не удалось сохранить настройки в БД."
+        await inter.edit_original_response(content=warn, embed=embed, view=view)
 
 
 def setup(bot: commands.Bot):

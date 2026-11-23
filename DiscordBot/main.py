@@ -58,7 +58,7 @@ async def rotate_presence():
     count_str = f"{count:,}".replace(",", " ")
     activity = disnake.Activity(
         type=disnake.ActivityType.watching,
-        name=f"{count_str} {_plural_servers(count)} | /help"
+        name=f"{count_str} {_plural_servers(count)} | /помощь"
     )
     await bot.change_presence(activity=activity)
 
@@ -83,7 +83,9 @@ async def on_ready():
 
 
 @bot.event
-async def on_slash_command_error(inter: disnake.ApplicationCommandInteraction, error: Exception):
+async def on_slash_command_error(
+    inter: disnake.ApplicationCommandInteraction, error: Exception
+):
     if isinstance(error, commands.CommandInvokeError):
         error = error.original
 

@@ -5,7 +5,7 @@ import disnake
 from disnake.ext import commands
 
 from api import api
-from config import GUILD_ONLY, ACCENT_GOLD, COMBAT_RED, TACTICAL_GREEN, UNIFIED_FOOTER
+from config import ACCENT_GOLD, COMBAT_RED, GUILD_ONLY, TACTICAL_GREEN, UNIFIED_FOOTER
 from utils import check_moderation_target, send_log
 
 
@@ -17,13 +17,21 @@ class Moderation(commands.Cog):
 
     @commands.slash_command(
         contexts=GUILD_ONLY,
-        name="lock",
+        name="модерация",
+        description="Команды модерации",
+    )
+    async def moderation(self, inter: disnake.ApplicationCommandInteraction):
+        pass
+
+    @moderation.sub_command(
+        name="закрыть",
         description="Заблокировать канал для отправки сообщений",
     )
-    @commands.default_member_permissions(manage_channels=True)
+    @commands.has_permissions(manage_channels=True)
     async def lock_channel(self, inter: disnake.ApplicationCommandInteraction):
         await inter.response.defer(ephemeral=True)
         channel = inter.channel
+
         guild_config = await api.get_guild_config(str(inter.guild_id)) or {}
         role_id = (guild_config.get("security") or {}).get("verificationRoleId")
         target_role = (
@@ -53,19 +61,21 @@ class Moderation(commands.Cog):
         )
         embed = disnake.Embed(
             title="🔒 Канал заблокирован",
-            description=f"**Канал:** {channel.mention}\n**Модератор:** {inter.author.mention}",
+            description=(
+                f"**Канал:** {channel.mention}\n"
+                f"**Модератор:** {inter.author.mention}"
+            ),
             color=COMBAT_RED,
             timestamp=disnake.utils.utcnow(),
         )
         embed.set_footer(text=UNIFIED_FOOTER)
         await send_log(inter.guild, embed)
 
-    @commands.slash_command(
-        contexts=GUILD_ONLY,
-        name="unlock",
+    @moderation.sub_command(
+        name="открыть",
         description="Разблокировать канал для отправки сообщений",
     )
-    @commands.default_member_permissions(manage_channels=True)
+    @commands.has_permissions(manage_channels=True)
     async def unlock_channel(self, inter: disnake.ApplicationCommandInteraction):
         await inter.response.defer(ephemeral=True)
         channel = inter.channel
@@ -99,24 +109,29 @@ class Moderation(commands.Cog):
         )
         embed = disnake.Embed(
             title="🔓 Блокировка канала снята",
-            description=f"**Канал:** {channel.mention}\n**Модератор:** {inter.author.mention}",
+            description=(
+                f"**Канал:** {channel.mention}\n"
+                f"**Модератор:** {inter.author.mention}"
+            ),
             color=TACTICAL_GREEN,
             timestamp=disnake.utils.utcnow(),
         )
         embed.set_footer(text=UNIFIED_FOOTER)
         await send_log(inter.guild, embed)
 
-    @commands.slash_command(
-        contexts=GUILD_ONLY,
-        name="slowmode",
+    @moderation.sub_command(
+        name="медленный_режим",
         description="Установить задержку отправки сообщений",
     )
-    @commands.default_member_permissions(manage_channels=True)
+    @commands.has_permissions(manage_channels=True)
     async def slowmode(
         self,
         inter: disnake.ApplicationCommandInteraction,
         seconds: int = commands.Param(
-            description="Задержка в секундах (0 для отключения)", ge=0, le=21600
+            name="секунды",
+            description="Задержка в секундах (0 для отключения)",
+            ge=0,
+            le=21600,
         ),
     ):
         await inter.response.defer(ephemeral=True)
@@ -135,32 +150,36 @@ class Moderation(commands.Cog):
         )
         await inter.edit_original_response(content=message)
 
-    @commands.slash_command(
-        contexts=GUILD_ONLY,
-        name="timeout",
+    @moderation.sub_command(
+        name="мут",
         description="Временно заглушить участника",
     )
-    @commands.default_member_permissions(moderate_members=True)
+    @commands.has_guild_permissions(moderate_members=True)
     async def timeout(
         self,
         inter: disnake.ApplicationCommandInteraction,
-        member: disnake.Member = commands.Param(description="Кого заглушить"),
+        member: disnake.Member = commands.Param(
+            name="участник", description="Кого заглушить"
+        ),
         minutes: int = commands.Param(
-            description="Длительность (минуты)", ge=1, le=40320
+            name="минуты", description="Длительность (минуты)", ge=1, le=40320
         ),
         reason: str = commands.Param(
-            default="Нарушение правил сервера", description="Причина"
+            name="причина",
+            default="Нарушение правил сервера",
+            description="Причина",
         ),
     ):
         await inter.response.defer(ephemeral=True)
-        if error_msg := check_moderation_target(inter, member):
-            await inter.edit_original_response(content=error_msg)
+        if error := check_moderation_target(inter, member):
+            await inter.edit_original_response(content=error)
             return
 
         duration = datetime.timedelta(minutes=minutes)
         try:
             await member.timeout(
-                duration=duration, reason=f"{reason} (Модератор: {inter.author})"
+                duration=duration,
+                reason=f"{reason} (Модератор: {inter.author})",
             )
             await inter.edit_original_response(
                 content=f"🔇 {member.mention} отправлен в таймаут на **{minutes} мин.**\nПричина: *{reason}*"
@@ -168,7 +187,7 @@ class Moderation(commands.Cog):
             embed = disnake.Embed(
                 title="🔇 Применён таймаут",
                 description=(
-                    f"**Нарушитель:** {member.mention} (`{member.id}`)\n"
+                    f"**Нарушитель:** {member.mention} (\`{member.id}\`)\n"
                     f"**Модератор:** {inter.author.mention}\n"
                     f"**Время:** {minutes} мин.\n"
                     f"**Причина:** {reason}"
@@ -183,21 +202,24 @@ class Moderation(commands.Cog):
                 content="⚠️ У бота недостаточно прав для таймаута этого участника."
             )
 
-    @commands.slash_command(
-        contexts=GUILD_ONLY, name="kick", description="Исключить участника с сервера"
+    @moderation.sub_command(
+        name="кик",
+        description="Исключить участника с сервера",
     )
-    @commands.default_member_permissions(kick_members=True)
+    @commands.has_guild_permissions(kick_members=True)
     async def kick(
         self,
         inter: disnake.ApplicationCommandInteraction,
-        member: disnake.Member = commands.Param(description="Кого исключить"),
+        member: disnake.Member = commands.Param(
+            name="участник", description="Кого исключить"
+        ),
         reason: str = commands.Param(
-            default="Исключён модератором", description="Причина"
+            name="причина", default="Исключён модератором", description="Причина"
         ),
     ):
         await inter.response.defer(ephemeral=True)
-        if error_msg := check_moderation_target(inter, member):
-            await inter.edit_original_response(content=error_msg)
+        if error := check_moderation_target(inter, member):
+            await inter.edit_original_response(content=error)
             return
 
         try:
@@ -208,7 +230,7 @@ class Moderation(commands.Cog):
             embed = disnake.Embed(
                 title="👢 Участник исключён",
                 description=(
-                    f"**Исключён:** {member.mention} (`{member.id}`)\n"
+                    f"**Исключён:** {member.mention} (\`{member.id}\`)\n"
                     f"**Модератор:** {inter.author.mention}\n"
                     f"**Причина:** {reason}"
                 ),
@@ -222,21 +244,24 @@ class Moderation(commands.Cog):
                 content="⚠️ У бота недостаточно прав для исключения этого участника."
             )
 
-    @commands.slash_command(
-        contexts=GUILD_ONLY, name="ban", description="Заблокировать участника на сервере"
+    @moderation.sub_command(
+        name="бан",
+        description="Заблокировать участника на сервере",
     )
-    @commands.default_member_permissions(ban_members=True)
+    @commands.has_guild_permissions(ban_members=True)
     async def ban(
         self,
         inter: disnake.ApplicationCommandInteraction,
-        member: disnake.Member = commands.Param(description="Нарушитель"),
+        member: disnake.Member = commands.Param(
+            name="участник", description="Нарушитель"
+        ),
         reason: str = commands.Param(
-            default="Грубое нарушение правил", description="Причина"
+            name="причина", default="Грубое нарушение правил", description="Причина"
         ),
     ):
         await inter.response.defer(ephemeral=True)
-        if error_msg := check_moderation_target(inter, member):
-            await inter.edit_original_response(content=error_msg)
+        if error := check_moderation_target(inter, member):
+            await inter.edit_original_response(content=error)
             return
 
         try:
@@ -250,7 +275,7 @@ class Moderation(commands.Cog):
             embed = disnake.Embed(
                 title="🔨 Участник заблокирован",
                 description=(
-                    f"**Заблокирован:** {member.mention} (`{member.id}`)\n"
+                    f"**Заблокирован:** {member.mention} (\`{member.id}\`)\n"
                     f"**Модератор:** {inter.author.mention}\n"
                     f"**Причина:** {reason}"
                 ),
@@ -264,33 +289,40 @@ class Moderation(commands.Cog):
                 content="⚠️ У бота недостаточно прав для блокировки этого участника."
             )
 
-    @commands.slash_command(
-        contexts=GUILD_ONLY,
-        name="unban",
+    @moderation.sub_command(
+        name="разбан",
         description="Разблокировать пользователя по Discord ID",
     )
-    @commands.default_member_permissions(ban_members=True)
+    @commands.has_guild_permissions(ban_members=True)
     async def unban(
         self,
         inter: disnake.ApplicationCommandInteraction,
-        user_id: str = commands.Param(description="Discord ID заблокированного пользователя"),
-        reason: str = commands.Param(default="Амнистия / Разбан", description="Причина"),
+        user_id: str = commands.Param(
+            name="пользователь_id", description="Discord ID заблокированного пользователя"
+        ),
+        reason: str = commands.Param(
+            name="причина", default="Амнистия / Разбан", description="Причина"
+        ),
     ):
         await inter.response.defer(ephemeral=True)
         if not user_id.strip().isdigit():
-            await inter.edit_original_response(content="❌ Указан некорректный Discord ID.")
+            await inter.edit_original_response(
+                content="❌ Указан некорректный Discord ID."
+            )
             return
 
         try:
             user = await self.bot.fetch_user(int(user_id.strip()))
-            await inter.guild.unban(user, reason=f"{reason} (Модератор: {inter.author})")
+            await inter.guild.unban(
+                user, reason=f"{reason} (Модератор: {inter.author})"
+            )
             await inter.edit_original_response(
-                content=f"🔓 Пользователь **{user.name}** (`{user.id}`) разблокирован."
+                content=f"🔓 Пользователь **{user.name}** (\`{user.id}\`) разблокирован."
             )
             embed = disnake.Embed(
                 title="🔓 Пользователь разблокирован",
                 description=(
-                    f"**Пользователь:** {user.mention} (`{user.id}`)\n"
+                    f"**Пользователь:** {user.mention} (\`{user.id}\`)\n"
                     f"**Модератор:** {inter.author.mention}\n"
                     f"**Причина:** {reason}"
                 ),
@@ -304,14 +336,17 @@ class Moderation(commands.Cog):
                 content=f"❌ Не удалось разблокировать пользователя: {error}"
             )
 
-    @commands.slash_command(
-        contexts=GUILD_ONLY, name="clear", description="Очистить последние сообщения в канале"
+    @moderation.sub_command(
+        name="очистить",
+        description="Очистить последние сообщения в канале",
     )
-    @commands.default_member_permissions(manage_messages=True)
+    @commands.has_permissions(manage_messages=True)
     async def clear(
         self,
         inter: disnake.ApplicationCommandInteraction,
-        amount: int = commands.Param(description="Количество (1–100)", ge=1, le=100),
+        amount: int = commands.Param(
+            name="количество", description="Количество (1–100)", ge=1, le=100
+        ),
     ):
         await inter.response.defer(ephemeral=True)
         cutoff = disnake.utils.utcnow() - datetime.timedelta(days=14)

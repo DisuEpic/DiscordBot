@@ -207,7 +207,7 @@ class SettingsDashboardView(disnake.ui.View):
 
         if saved:
             await inter.edit_original_response(
-                content=f"✅ {labels[choice]} Вызови `/settings`, чтобы обновить панель."
+                content=f"✅ {labels[choice]} Вызови `/настройки показать`, чтобы обновить панель."
             )
         else:
             await inter.edit_original_response(
@@ -264,7 +264,7 @@ class SettingsDashboardView(disnake.ui.View):
         await inter.response.edit_message(
             content=(
                 "⚠️ Сбросить настройки Mirei, управляемые этой панелью? "
-                "Фильтры Discord AutoMod управляются через `/automod`."
+                "Фильтры автомодерации управляются через `/автомод`."
             ),
             view=ConfirmResetView(self.author_id),
         )

@@ -21,7 +21,7 @@ class Utility(commands.Cog):
 
     @commands.slash_command(
         contexts=GUILD_ONLY,
-        name="help",
+        name="помощь",
         description="💠 Список возможностей и команд Mirei",
     )
     async def help_cmd(self, inter: disnake.ApplicationCommandInteraction):
@@ -38,48 +38,50 @@ class Utility(commands.Cog):
             value=(
                 "• Упомяни Mirei или ответь на её сообщение.\n"
                 "• Можно приложить картинку из Discord.\n"
-                "• `/ai` — выбор провайдера, автоответов, сценария и правил."
+                "• `/ии` — выбор провайдера, автоответов, сценария и правил."
             ),
             inline=False,
         )
         embed.add_field(
             name="🛡️ Защита, верификация и настройки",
             value=(
-                "• `/setup_config` — роли, каналы, капча, автокик, ловушка и голосовые комнаты.\n"
-                "• `/settings` — текущая конфигурация и сброс параметров.\n"
-                "• `/send_verify_panel` и `/edit_verify_panel` — панель верификации.\n"
-                "• `/set_welcome` — текст приветствия.\n"
-                "• `/unverify` — сброс верификации участника."
+                "• `/настройки настроить` — роли, каналы, капча, автокик, ловушка и голосовые комнаты.\n"
+                "• `/настройки показать` — текущая конфигурация и сброс параметров.\n"
+                "• `/верификация отправить_панель` и `/верификация обновить_панель` — панель верификации.\n"
+                "• `/настройки приветствие` — текст приветствия.\n"
+                "• `/верификация снять` — сброс верификации участника."
             ),
             inline=False,
         )
 
         moderation_help = (
-            "• `/timeout`, `/kick`, `/ban`, `/unban` — модерация участников.\n"
-            "• `/clear` — очистка до 100 последних сообщений.\n"
-            "• `/lock`, `/unlock`, `/slowmode` — управление чатом."
+            "• `/модерация мут`, `/модерация кик`, `/модерация бан`, "
+            "`/модерация разбан` — модерация участников.\n"
+            "• `/модерация очистить` — очистка до 100 последних сообщений.\n"
+            "• `/модерация закрыть`, `/модерация открыть`, "
+            "`/модерация медленный_режим` — управление чатом."
         )
         if self.bot.get_cog("AutoModeration"):
-            moderation_help += "\n• `/automod set` и `/automod status` — фильтры и исключения."
+            moderation_help += "\n• `/автомод помощь` — фильтры и исключения."
         embed.add_field(name="🔨 Модерация", value=moderation_help, inline=False)
 
         embed.add_field(
             name="🔊 Голосовые комнаты и роли по кнопкам",
             value=(
                 "• Войди в канал-генератор, чтобы создать временную комнату.\n"
-                "• `/add_role`, `/delete_role`, `/send_category_panel`, "
-                "`/send_all_categories`, `/edit_category_panel` — каталог и панели ролей.\n"
-                "• `/give_role` и `/take_role` — ручное управление ролями."
+                "• `/роли добавить`, `/роли удалить`, `/роли панель отправить`, "
+                "`/роли панель отправить_все`, `/роли панель обновить` — каталог и панели ролей.\n"
+                "• `/роли выдать` и `/роли снять` — ручное управление ролями."
             ),
             inline=False,
         )
         embed.add_field(
             name="📊 Статистика и утилиты",
             value=(
-                "• `/stats setup`, `/stats refresh`, `/stats toggle`, "
-                "`/stats remove` — счётчики в каналах.\n"
-                "• `/server_stats` — статистика сервера.\n"
-                "• `/scan`, `/server_info`, `/avatar`, `/ping`."
+                "• `/статистика настроить`, `/статистика обновить`, "
+                "`/статистика переключить`, `/статистика отключить` — счётчики в каналах.\n"
+                "• `/статистика сервер` — статистика сервера.\n"
+                "• `/профиль`, `/сервер`, `/аватар`, `/пинг`."
             ),
             inline=False,
         )
@@ -88,41 +90,68 @@ class Utility(commands.Cog):
 
     @commands.slash_command(
         contexts=GUILD_ONLY,
-        name="setup_config",
-        description="Настроить каналы, верификацию, автокик, ловушку и временные комнаты",
+        name="настройки",
+        description="Настройки Mirei",
     )
     @commands.default_member_permissions(administrator=True)
+    @commands.has_guild_permissions(administrator=True)
+    async def settings_group(self, inter: disnake.ApplicationCommandInteraction):
+        pass
+
+    @settings_group.sub_command(
+        name="настроить",
+        description="Настроить каналы, верификацию, автокик, ловушку и временные комнаты",
+    )
     async def setup_config(
         self,
         inter: disnake.ApplicationCommandInteraction,
         verification_role: Optional[disnake.Role] = commands.Param(
-            default=None, description="Роль после верификации"
+            name="роль_верификации",
+            default=None,
+            description="Роль после верификации",
         ),
         welcome_channel: Optional[disnake.TextChannel] = commands.Param(
-            default=None, description="Канал для карточек приветствия"
+            name="канал_приветствий",
+            default=None,
+            description="Канал для карточек приветствия",
         ),
         log_channel: Optional[disnake.TextChannel] = commands.Param(
-            default=None, description="Канал журнала сервера"
+            name="канал_журнала",
+            default=None,
+            description="Канал журнала сервера",
         ),
         trap_channel: Optional[disnake.TextChannel] = commands.Param(
-            default=None, description="Канал-ловушка с исключением за отправку сообщения"
+            name="канал_ловушка",
+            default=None,
+            description="Канал-ловушка с исключением за отправку сообщения",
         ),
         voice_hub_channel: Optional[disnake.VoiceChannel] = commands.Param(
-            default=None, description="Голосовой канал «Создать комнату»"
+            name="канал_генератор",
+            default=None,
+            description="Голосовой канал «Создать комнату»",
         ),
         voice_room_template: Optional[str] = commands.Param(
-            default=None, description="Шаблон имени комнаты, например ╠ 〘🔊〙 {user}"
+            name="шаблон_комнаты",
+            default=None,
+            description="Шаблон имени комнаты, например ╠ 〘🔊〙 {user}",
         ),
         create_voice_hub: bool = commands.Param(
-            default=False, description="Создать канал-генератор автоматически"
+            name="создать_генератор",
+            default=False,
+            description="Создать канал-генератор автоматически",
         ),
         use_captcha: Optional[bool] = commands.Param(
-            default=None, description="Требовать капчу у новых аккаунтов"
+            name="капча",
+            default=None,
+            description="Требовать капчу у новых аккаунтов",
         ),
         auto_kick_unverified: Optional[bool] = commands.Param(
-            default=None, description="Исключать новичков по истечении времени верификации"
+            name="автокик",
+            default=None,
+            description="Исключать новичков по истечении времени верификации",
         ),
         verify_timeout_minutes: Optional[int] = commands.Param(
+            name="минуты_на_верификацию",
             default=None,
             description="Время на верификацию в минутах",
             ge=1,
@@ -250,7 +279,7 @@ class Utility(commands.Cog):
             await inter.edit_original_response(
                 content=(
                     "❌ API не подтвердило сохранение всей конфигурации. "
-                    "Проверь текущие значения через `/settings`."
+                    "Проверь текущие значения через `/настройки показать`."
                 )
             )
             return
@@ -310,12 +339,10 @@ class Utility(commands.Cog):
         embed.set_footer(text=UNIFIED_FOOTER)
         await inter.edit_original_response(embed=embed)
 
-    @commands.slash_command(
-        contexts=GUILD_ONLY,
-        name="settings",
+    @settings_group.sub_command(
+        name="показать",
         description="Посмотреть и изменить настройки Mirei",
     )
-    @commands.default_member_permissions(administrator=True)
     async def settings(self, inter: disnake.ApplicationCommandInteraction):
         await inter.response.defer(ephemeral=True)
         guild = inter.guild
@@ -374,7 +401,7 @@ class Utility(commands.Cog):
         stats_status = (
             f"Включена (стиль: `{(stats.get('style') or 'en').upper()}`)"
             if stats.get("enabled")
-            else "Отключена (`/stats setup`)"
+            else "Отключена (`/статистика настроить`)"
         )
 
         categories = sorted({role.get("category") or "Общие" for role in guild_roles})
@@ -413,14 +440,14 @@ class Utility(commands.Cog):
 
     @commands.slash_command(
         contexts=GUILD_ONLY,
-        name="scan",
+        name="профиль",
         description="Показать информацию об участнике",
     )
     async def scan(
         self,
         inter: disnake.ApplicationCommandInteraction,
         member: Optional[disnake.Member] = commands.Param(
-            default=None, description="Чей профиль показать"
+            name="участник", default=None, description="Чей профиль показать"
         ),
     ):
         target = member or inter.author
@@ -454,7 +481,7 @@ class Utility(commands.Cog):
 
     @commands.slash_command(
         contexts=GUILD_ONLY,
-        name="ping",
+        name="пинг",
         description="Проверить задержку Discord и состояние API",
     )
     async def ping(self, inter: disnake.ApplicationCommandInteraction):
@@ -478,7 +505,7 @@ class Utility(commands.Cog):
 
     @commands.slash_command(
         contexts=GUILD_ONLY,
-        name="server_info",
+        name="сервер",
         description="Показать информацию о сервере",
     )
     async def server_info(self, inter: disnake.ApplicationCommandInteraction):
@@ -517,14 +544,14 @@ class Utility(commands.Cog):
 
     @commands.slash_command(
         contexts=GUILD_ONLY,
-        name="avatar",
+        name="аватар",
         description="Показать аватар участника",
     )
     async def avatar(
         self,
         inter: disnake.ApplicationCommandInteraction,
         member: Optional[disnake.Member] = commands.Param(
-            default=None, description="Чей аватар показать"
+            name="участник", default=None, description="Чей аватар показать"
         ),
     ):
         target = member or inter.author
@@ -540,14 +567,16 @@ class Utility(commands.Cog):
 
     @commands.slash_command(
         contexts=GUILD_ONLY,
-        name="user_profile",
+        name="профиль_бд",
         description="Показать профиль участника в базе данных",
     )
     @commands.default_member_permissions(administrator=True)
     async def user_profile(
         self,
         inter: disnake.ApplicationCommandInteraction,
-        member: Optional[disnake.Member] = None,
+        member: Optional[disnake.Member] = commands.Param(
+            name="участник", default=None
+        ),
     ):
         await inter.response.defer(ephemeral=True)
         target = member or inter.author
@@ -577,14 +606,16 @@ class Utility(commands.Cog):
 
     @commands.slash_command(
         contexts=GUILD_ONLY,
-        name="test_join",
+        name="проверить_вход",
         description="Симулировать вход участника и проверить восстановление ролей",
     )
     @commands.default_member_permissions(administrator=True)
     async def test_join(
         self,
         inter: disnake.ApplicationCommandInteraction,
-        member: Optional[disnake.Member] = None,
+        member: Optional[disnake.Member] = commands.Param(
+            name="участник", default=None
+        ),
     ):
         await inter.response.defer(ephemeral=True)
         target = member or inter.author
