@@ -5,7 +5,7 @@ using DiscordBot_API.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
-
+using System.Text.Json;
 namespace DiscordBot_API.Controllers;
 
 [ApiController]
@@ -42,7 +42,8 @@ public class ConfigController : ControllerBase
             c.Security?.TrapChannelId,
             c.Security?.UseCaptcha ?? true,
             c.Security?.AutoKickUnverified ?? false,
-            c.Security?.VerifyTimeoutMinutes ?? 10
+            c.Security?.VerifyTimeoutMinutes ?? 10,
+            GetAutomodConfig(c.Security)
         ),
         new WelcomeConfigDto(
             c.Welcome?.ChannelId,
@@ -292,7 +293,87 @@ public class ConfigController : ControllerBase
         await _context.SaveChangesAsync();
         return SaveCacheAndReturnOk(core);
     }
+    private static AutomodScopeDto? ReadAutomodScope(string? value) =>
+    value is null ? null : JsonSerializer.Deserialize<AutomodScopeDto>(value);
 
+    private static AutomodConfigDto GetAutomodConfig(GuildSecurityConfig? security) =>
+        new(
+            security?.AutomodInvites,
+            security?.AutomodSpam,
+            security?.AutomodMentions,
+            new Dictionary<string, AutomodScopeDto?>
+            {
+                ["invites"] = ReadAutomodScope(security?.AutomodInvitesScope),
+                ["spam"] = ReadAutomodScope(security?.AutomodSpamScope),
+                ["mentions"] = ReadAutomodScope(security?.AutomodMentionsScope)
+            });
+
+    [HttpPut("{guildId}/security/automod/{filter}")]
+    public async Task<IActionResult> UpdateAutomodFilter(
+        string guildId,
+        string filter,
+        [FromBody] UpdateAutomodFilterRequest request)
+    {
+        if (!Snowflake.IsValid(guildId))
+            return BadRequest(new { message = "Некорректный GuildId." });
+
+        if (filter is not ("invites" or "spam" or "mentions") ||
+            request.Enabled is not bool enabled)
+        {
+            return BadRequest(new { message = "Укажи фильтр и значение enabled." });
+        }
+
+        string? serializedScope = null;
+
+        if (request.Scope is { } scope)
+        {
+            var ids = scope.ChannelIds;
+            if (ids is null || ids.Any(id => !Snowflake.IsValid(id)))
+                return BadRequest(new { message = "Некорректный ID канала." });
+
+            var channelIds = ids.Distinct().ToArray();
+            var validScope = scope.Mode switch
+            {
+                "all" => channelIds.Length == 0,
+                "exclude" => channelIds.Length is >= 1 and <= 50,
+                "only" => channelIds.Length == 1,
+                _ => false
+            };
+
+            if (!validScope)
+                return BadRequest(new { message = "Некорректная область AutoMod." });
+
+            serializedScope = JsonSerializer.Serialize(
+                new AutomodScopeDto(scope.Mode, channelIds));
+        }
+
+        var core = await EnsureCoreConfigExistsAsync(guildId);
+        var security = core.Security!;
+
+        switch (filter)
+        {
+            case "invites":
+                security.AutomodInvites = enabled;
+                if (serializedScope is not null)
+                    security.AutomodInvitesScope = serializedScope;
+                break;
+
+            case "spam":
+                security.AutomodSpam = enabled;
+                if (serializedScope is not null)
+                    security.AutomodSpamScope = serializedScope;
+                break;
+
+            case "mentions":
+                security.AutomodMentions = enabled;
+                if (serializedScope is not null)
+                    security.AutomodMentionsScope = serializedScope;
+                break;
+        }
+
+        await _context.SaveChangesAsync();
+        return SaveCacheAndReturnOk(core);
+    }
     [HttpPost("{guildId}/reset")]
     public async Task<IActionResult> ResetConfig(string guildId)
     {

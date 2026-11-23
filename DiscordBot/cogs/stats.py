@@ -1,9 +1,11 @@
 import asyncio
+from typing import Any, Dict, Optional, Set
+
 import disnake
 from disnake.ext import commands, tasks
-from typing import Optional, Dict, Any, Set
+
 from api import api
-from config import GUILD_ONLY, BRAND_COLOR, TACTICAL_GREEN, UNIFIED_FOOTER, log
+from config import BRAND_COLOR, GUILD_ONLY, TACTICAL_GREEN, UNIFIED_FOOTER, log
 
 
 STAT_LABELS = {
@@ -18,12 +20,12 @@ STAT_LABELS = {
     },
     "ru": {
         "category": "📊 СТАТИСТИКА СЕРВЕРА 📊",
-        "all_members": "👥 Всего: {count}",
-        "members": "👤 Участники: {count}",
-        "bots": "🤖 Боты: {count}",
-        "channels": "💬 Каналы: {count}",
-        "roles": "🎭 Роли: {count}",
-        "voice": "🔊 В войсе: {count}",
+        "all_members": "Всего участников: {count}",
+        "members": "Участники: {count}",
+        "bots": "Боты: {count}",
+        "channels": "Каналы: {count}",
+        "roles": "Роли: {count}",
+        "voice": "В войсе: {count}",
     },
 }
 
@@ -47,30 +49,35 @@ class Stats(commands.Cog):
         self.update_stats_loop.cancel()
 
     @staticmethod
-    def _compute_metrics(guild: disnake.Guild, include_statuses: bool = False) -> Dict[str, int]:
-        """Считает все метрики сервера за один проход по списку участников и каналов."""
+    def _compute_metrics(
+        guild: disnake.Guild, include_statuses: bool = False
+    ) -> Dict[str, int]:
         all_members = guild.member_count or len(guild.members)
-        bots = 0
-        online = 0
-        idle = 0
-        dnd = 0
+        bots = online = idle = dnd = 0
 
-        for m in guild.members:
-            if m.bot:
+        for member in guild.members:
+            if member.bot:
                 bots += 1
             elif include_statuses:
-                st = m.status
-                if st == disnake.Status.online:
+                if member.status == disnake.Status.online:
                     online += 1
-                elif st == disnake.Status.idle:
+                elif member.status == disnake.Status.idle:
                     idle += 1
-                elif st == disnake.Status.dnd:
+                elif member.status == disnake.Status.dnd:
                     dnd += 1
 
         members = max(0, all_members - bots)
-        channels = sum(1 for c in guild.channels if not isinstance(c, disnake.CategoryChannel))
-        roles = max(0, len(guild.roles) - 1)  # без @everyone
-        voice = sum(sum(1 for m in vc.members if not m.bot) for vc in guild.voice_channels)
+        channels = sum(
+            1 for channel in guild.channels
+            if not isinstance(channel, disnake.CategoryChannel)
+        )
+        roles = max(0, len(guild.roles) - 1)
+        voice = sum(
+            1
+            for channel in guild.voice_channels
+            for member in channel.members
+            if not member.bot
+        )
 
         metrics = {
             "all_members": all_members,
@@ -81,48 +88,51 @@ class Stats(commands.Cog):
             "voice": voice,
         }
         if include_statuses:
-            metrics["online"] = online
-            metrics["idle"] = idle
-            metrics["dnd"] = dnd
-            metrics["offline"] = max(0, members - (online + idle + dnd))
+            metrics.update(
+                online=online,
+                idle=idle,
+                dnd=dnd,
+                offline=max(0, members - online - idle - dnd),
+            )
         return metrics
 
     @staticmethod
     def _format_name(style: str, key: str, value: int) -> str:
-        tpl_map = STAT_LABELS.get(style, STAT_LABELS["en"])
-        return tpl_map[key].format(count=value)[:100]
+        labels = STAT_LABELS.get(style, STAT_LABELS["en"])
+        return labels[key].format(count=value)[:100]
 
-    async def _sync_guild_stats(self, guild: disnake.Guild, stats_cfg: Dict[str, Any]) -> int:
-        """Обновляет названия каналов статистики, если цифры изменились. Возвращает число обновлённых каналов."""
-        if not stats_cfg.get("enabled"):
+    async def _sync_guild_stats(
+        self, guild: disnake.Guild, stats: Dict[str, Any]
+    ) -> int:
+        if not stats.get("enabled"):
             return 0
 
-        style = stats_cfg.get("style") or "en"
+        style = stats.get("style") or "en"
         metrics = self._compute_metrics(guild)
         updated = 0
 
-        for metric_key, dto_field in STAT_FIELD_MAP:
-            ch_id_str = stats_cfg.get(dto_field)
-            if not ch_id_str or not str(ch_id_str).isdigit():
+        for key, field in STAT_FIELD_MAP:
+            channel_id = stats.get(field)
+            if not channel_id or not str(channel_id).isdigit():
                 continue
 
-            ch = guild.get_channel(int(ch_id_str))
-            if not isinstance(ch, disnake.VoiceChannel):
+            channel = guild.get_channel(int(channel_id))
+            if not isinstance(channel, disnake.VoiceChannel):
                 continue
 
-            target_name = self._format_name(style, metric_key, metrics[metric_key])
-            if ch.name == target_name:
+            name = self._format_name(style, key, metrics[key])
+            if channel.name == name:
                 continue
 
-            self.ignored_audit_ids.add(ch.id)
+            self.ignored_audit_ids.add(channel.id)
             try:
-                await ch.edit(name=target_name, reason="Обновление счётчиков статистики Mirei")
+                await channel.edit(name=name, reason="Обновление счётчиков Mirei")
                 updated += 1
                 await asyncio.sleep(1.0)
             except disnake.HTTPException:
                 pass
             finally:
-                self.ignored_audit_ids.discard(ch.id)
+                self.ignored_audit_ids.discard(channel.id)
 
         return updated
 
@@ -130,10 +140,10 @@ class Stats(commands.Cog):
     async def update_stats_loop(self):
         for guild in list(self.bot.guilds):
             try:
-                cfg = await api.get_guild_config(str(guild.id))
-                stats_cfg = (cfg or {}).get("stats") or {}
-                if stats_cfg.get("enabled"):
-                    await self._sync_guild_stats(guild, stats_cfg)
+                config = await api.get_guild_config(str(guild.id))
+                stats = (config or {}).get("stats") or {}
+                if stats.get("enabled"):
+                    await self._sync_guild_stats(guild, stats)
             except Exception:
                 log.exception("Ошибка обновления статистики для сервера %s", guild.id)
             await asyncio.sleep(0)
@@ -146,13 +156,15 @@ class Stats(commands.Cog):
     @commands.slash_command(
         contexts=GUILD_ONLY,
         name="stats",
-        description="📊 Управление счётчиками статистики сервера"
+        description="Управление счётчиками статистики сервера",
     )
     @commands.default_member_permissions(administrator=True)
     async def stats_group(self, inter: disnake.ApplicationCommandInteraction):
         pass
 
-    @stats_group.sub_command(name="setup", description="Создать или обновить категорию и каналы счётчиков статистики")
+    @stats_group.sub_command(
+        name="setup", description="Создать или обновить каналы счётчиков"
+    )
     async def stats_setup(
         self,
         inter: disnake.ApplicationCommandInteraction,
@@ -162,50 +174,34 @@ class Stats(commands.Cog):
                 "🇬🇧 English (All Members: 218)": "en",
                 "🇷🇺 Русский (👥 Всего: 218)": "ru",
             },
-            description="Язык и стиль подписей каналов"
+            description="Язык подписей каналов",
         ),
-        include_all_members: bool = commands.Param(default=True, description="Счётчик всех участников"),
-        include_members: bool = commands.Param(default=True, description="Счётчик людей (без ботов)"),
-        include_bots: bool = commands.Param(default=True, description="Счётчик ботов"),
-        include_channels: bool = commands.Param(default=True, description="Счётчик каналов"),
-        include_roles: bool = commands.Param(default=True, description="Счётчик ролей"),
-        include_voice: bool = commands.Param(default=False, description="Счётчик участников в войсе прямо сейчас"),
-        category: Optional[disnake.CategoryChannel] = commands.Param(default=None, description="Существующая категория (если не указывать — создаст новую сверху)")
+        include_all_members: bool = commands.Param(
+            default=True, description="Счётчик всех участников"
+        ),
+        include_members: bool = commands.Param(
+            default=True, description="Счётчик людей без ботов"
+        ),
+        include_bots: bool = commands.Param(
+            default=True, description="Счётчик ботов"
+        ),
+        include_channels: bool = commands.Param(
+            default=True, description="Счётчик каналов"
+        ),
+        include_roles: bool = commands.Param(
+            default=True, description="Счётчик ролей"
+        ),
+        include_voice: bool = commands.Param(
+            default=False, description="Счётчик участников в голосовых каналах"
+        ),
+        category: Optional[disnake.CategoryChannel] = commands.Param(
+            default=None, description="Категория для новых счётчиков"
+        ),
     ):
         await inter.response.defer(ephemeral=True)
         guild = inter.guild
         guild_id = str(guild.id)
 
-        cfg = await api.get_guild_config(guild_id) or {}
-        existing_stats = cfg.get("stats") or {}
-
-        target_cat = category
-        if not target_cat and existing_stats.get("categoryId") and str(existing_stats["categoryId"]).isdigit():
-            maybe_cat = guild.get_channel(int(existing_stats["categoryId"]))
-            if isinstance(maybe_cat, disnake.CategoryChannel):
-                target_cat = maybe_cat
-
-        overwrites = {
-            guild.default_role: disnake.PermissionOverwrite(view_channel=True, connect=False),
-        }
-        if guild.me:
-            overwrites[guild.me] = disnake.PermissionOverwrite(view_channel=True, connect=True, manage_channels=True)
-
-        if not target_cat:
-            cat_name = STAT_LABELS[style]["category"]
-            try:
-                target_cat = await guild.create_category(
-                    name=cat_name,
-                    overwrites=overwrites,
-                    position=0,
-                    reason=f"Настройка статистики Mirei ({inter.author})"
-                )
-                self.ignored_audit_ids.add(target_cat.id)
-            except disnake.Forbidden:
-                await inter.edit_original_response(content="⚠️ У бота недостаточно прав для создания категорий и каналов.")
-                return
-
-        metrics = self._compute_metrics(guild)
         toggles = {
             "all_members": include_all_members,
             "members": include_members,
@@ -214,210 +210,290 @@ class Stats(commands.Cog):
             "roles": include_roles,
             "voice": include_voice,
         }
-
         if not any(toggles.values()):
-            await inter.edit_original_response(content="⚠️ Вы отключили все счётчики. Включите хотя бы один!")
+            await inter.edit_original_response(content="Включи хотя бы один счётчик.")
             return
 
+        config = await api.get_guild_config_for_update(guild_id)
+        if config is None:
+            await inter.edit_original_response(content="API не вернуло настройки статистики.")
+            return
+        existing = config.get("stats") or {}
+
+        target_category = category
+        existing_category_id = str(existing.get("categoryId") or "")
+        if target_category is None and existing_category_id.isdecimal():
+            old_category = guild.get_channel(int(existing_category_id))
+            if isinstance(old_category, disnake.CategoryChannel):
+                target_category = old_category
+
+        overwrites = {
+            guild.default_role: disnake.PermissionOverwrite(
+                view_channel=True, connect=False
+            ),
+        }
+        if guild.me:
+            overwrites[guild.me] = disnake.PermissionOverwrite(
+                view_channel=True, connect=True, manage_channels=True
+            )
+
+        if target_category is None:
+            try:
+                target_category = await guild.create_category(
+                    name=STAT_LABELS[style]["category"],
+                    overwrites=overwrites,
+                    position=0,
+                    reason=f"Настройка статистики Mirei ({inter.author})",
+                )
+                self.ignored_audit_ids.add(target_category.id)
+            except disnake.Forbidden:
+                await inter.edit_original_response(
+                    content="⚠️ У бота недостаточно прав для создания категории."
+                )
+                return
+
+        metrics = self._compute_metrics(guild)
         payload: Dict[str, Any] = {
             "enabled": True,
             "style": style,
-            "categoryId": str(target_cat.id),
+            "categoryId": str(target_category.id),
         }
+        lines = []
 
-        created_lines = []
-        for metric_key, dto_field in STAT_FIELD_MAP:
-            enabled_flag = toggles[metric_key]
-            existing_id = existing_stats.get(dto_field)
-            existing_ch = guild.get_channel(int(existing_id)) if (existing_id and str(existing_id).isdigit()) else None
+        for key, field in STAT_FIELD_MAP:
+            channel_id = str(existing.get(field) or "")
+            channel = guild.get_channel(int(channel_id)) if channel_id.isdecimal() else None
 
-            if not enabled_flag:
-                if isinstance(existing_ch, disnake.VoiceChannel):
-                    self.ignored_audit_ids.add(existing_ch.id)
+            if not toggles[key]:
+                if isinstance(channel, disnake.VoiceChannel):
+                    self.ignored_audit_ids.add(channel.id)
                     try:
-                        await existing_ch.delete(reason="Отключение счётчика статистики")
-                    except disnake.HTTPException:
+                        await channel.delete(reason="Отключение счётчика статистики")
+                    except disnake.NotFound:
                         pass
-                payload[dto_field] = None
+                    except disnake.HTTPException:
+                        payload[field] = str(channel.id)
+                        lines.append(f"• Не удалось удалить {channel.mention}.")
+                        continue
+
+                payload[field] = None
                 continue
 
-            ch_name = self._format_name(style, metric_key, metrics[metric_key])
-            if isinstance(existing_ch, disnake.VoiceChannel):
-                if existing_ch.name != ch_name:
-                    self.ignored_audit_ids.add(existing_ch.id)
+            name = self._format_name(style, key, metrics[key])
+            if isinstance(channel, disnake.VoiceChannel):
+                if channel.name != name:
+                    self.ignored_audit_ids.add(channel.id)
                     try:
-                        await existing_ch.edit(name=ch_name)
+                        await channel.edit(name=name)
                     except disnake.HTTPException:
-                        pass
-                payload[dto_field] = str(existing_ch.id)
-                created_lines.append(f"• {existing_ch.mention} (`{ch_name}`)")
+                        lines.append(f"• Не удалось переименовать {channel.mention}.")
+                        payload[field] = str(channel.id)
+                        continue
+
+                payload[field] = str(channel.id)
+                lines.append(f"• {channel.mention} (`{name}`)")
             else:
                 try:
-                    new_ch = await guild.create_voice_channel(
-                        name=ch_name,
-                        category=target_cat,
+                    new_channel = await guild.create_voice_channel(
+                        name=name,
+                        category=target_category,
                         overwrites=overwrites,
-                        reason="Канал статистики сервера Mirei"
+                        reason="Канал статистики сервера Mirei",
                     )
-                    self.ignored_audit_ids.add(new_ch.id)
-                    payload[dto_field] = str(new_ch.id)
-                    created_lines.append(f"• {new_ch.mention} (`{ch_name}`)")
+                    self.ignored_audit_ids.add(new_channel.id)
+                    payload[field] = str(new_channel.id)
+                    lines.append(f"• {new_channel.mention} (`{name}`)")
                     await asyncio.sleep(0.4)
-                except disnake.Forbidden:
-                    payload[dto_field] = None
+                except disnake.HTTPException:
+                    payload[field] = None
+                    lines.append(f"• Не удалось создать счётчик `{name}`.")
 
         await asyncio.sleep(1.5)
         self.ignored_audit_ids.clear()
 
-        if await api.update_stats_config(guild_id, payload):
-            embed = disnake.Embed(
-                title="📊 Статистика сервера настроена!",
-                description=(
-                    f"**Категория:** `{target_cat.name}`\n"
-                    f"**Авто-обновление:** каждые 10 минут\n\n"
-                    + ("\n".join(created_lines) if created_lines else "*Каналы не созданы*")
-                ),
-                color=TACTICAL_GREEN
+        if not await api.update_stats_config(guild_id, payload):
+            await inter.edit_original_response(
+                content="❌ Discord мог применить изменения. API не подтвердило сохранение настроек."
             )
-            embed.set_footer(text=UNIFIED_FOOTER)
-            await inter.edit_original_response(embed=embed)
-        else:
-            await inter.edit_original_response(content="❌ Каналы созданы, но не удалось сохранить настройки в БД.")
+            return
 
-    @stats_group.sub_command(name="refresh", description="Принудительно обновить каналы статистики прямо сейчас")
+        summary = "\n".join(lines) or "Каналы счётчиков отсутствуют."
+        embed = disnake.Embed(
+            title="📊 Статистика сервера",
+            description=(
+                f"**Категория:** `{target_category.name}`\n"
+                "**Автообновление:** каждые 10 минут\n\n"
+                f"{summary}"
+            ),
+            color=TACTICAL_GREEN,
+        )
+        embed.set_footer(text=UNIFIED_FOOTER)
+        await inter.edit_original_response(embed=embed)
+
+    @stats_group.sub_command(
+        name="refresh", description="Обновить счётчики прямо сейчас"
+    )
     @commands.cooldown(1, 300, commands.BucketType.guild)
     async def stats_refresh(self, inter: disnake.ApplicationCommandInteraction):
         await inter.response.defer(ephemeral=True)
-        cfg = await api.get_guild_config(str(inter.guild_id)) or {}
-        stats_cfg = cfg.get("stats") or {}
-        if not stats_cfg.get("enabled"):
-            await inter.edit_original_response(content="⚠️ Статистика на этом сервере не настроена или отключена. Используйте `/stats setup`.")
+        config = await api.get_guild_config(str(inter.guild_id)) or {}
+        stats = config.get("stats") or {}
+        if not stats.get("enabled"):
+            await inter.edit_original_response(
+                content="⚠️ Статистика отключена или ещё не настроена. Используй `/stats setup`."
+            )
             return
 
-        updated = await self._sync_guild_stats(inter.guild, stats_cfg)
-        if updated > 0:
-            await inter.edit_original_response(content=f"✅ Обновлено каналов статистики: **{updated}** шт.!")
-        else:
-            await inter.edit_original_response(content="✅ Все показатели уже актуальны — переименование не потребовалось.")
+        updated = await self._sync_guild_stats(inter.guild, stats)
+        await inter.edit_original_response(content=f"Обновлено счётчиков: **{updated}**.")
 
-    @stats_group.sub_command(name="toggle", description="Включить или поставить на паузу авто-обновление счётчиков")
+    @stats_group.sub_command(
+        name="toggle", description="Включить или приостановить автообновление"
+    )
     async def stats_toggle(self, inter: disnake.ApplicationCommandInteraction):
         await inter.response.defer(ephemeral=True)
         guild_id = str(inter.guild_id)
-        cfg = await api.get_guild_config(guild_id) or {}
-        stats_cfg = dict(cfg.get("stats") or {})
-
-        if not any(stats_cfg.get(f) for _, f in STAT_FIELD_MAP):
-            await inter.edit_original_response(content="⚠️ Сначала создайте каналы статистики командой `/stats setup`.")
+        config = await api.get_guild_config_for_update(guild_id)
+        if config is None:
+            await inter.edit_original_response(content="API не вернуло настройки статистики.")
             return
 
-        new_state = not stats_cfg.get("enabled", False)
-        stats_cfg["enabled"] = new_state
-        if await api.update_stats_config(guild_id, stats_cfg):
-            msg = "🟢 Авто-обновление статистики **включено**!" if new_state else "🟡 Авто-обновление статистики **поставлено на паузу**."
-            await inter.edit_original_response(content=msg)
-        else:
-            await inter.edit_original_response(content="❌ Не удалось сохранить состояние в БД.")
+        stats = dict(config.get("stats") or {})
+        if not any(stats.get(field) for _, field in STAT_FIELD_MAP):
+            await inter.edit_original_response(
+                content="⚠️ Сначала создай счётчики командой `/stats setup`."
+            )
+            return
 
-    @stats_group.sub_command(name="remove", description="Отключить статистику и удалить созданные каналы")
+        stats["enabled"] = not stats.get("enabled", False)
+        if not await api.update_stats_config(guild_id, stats):
+            await inter.edit_original_response(
+                content="❌ API не подтвердило сохранение."
+            )
+            return
+
+        message = (
+            "🟢 Автообновление статистики включено."
+            if stats["enabled"]
+            else "🟡 Автообновление статистики приостановлено."
+        )
+        await inter.edit_original_response(content=message)
+
+    @stats_group.sub_command(
+        name="remove", description="Отключить статистику и удалить счётчики"
+    )
     async def stats_remove(
         self,
         inter: disnake.ApplicationCommandInteraction,
-        delete_channels: bool = commands.Param(default=True, description="Удалить сами голосовые каналы и пустую категорию из Discord?")
+        delete_channels: bool = commands.Param(
+            default=True, description="Удалить голосовые каналы счётчиков"
+        ),
     ):
         await inter.response.defer(ephemeral=True)
         guild = inter.guild
         guild_id = str(guild.id)
+        config = await api.get_guild_config_for_update(guild_id)
+        if config is None:
+            await inter.edit_original_response(content="API не вернуло настройки статистики.")
+            return
 
-        cfg = await api.get_guild_config(guild_id) or {}
-        stats_cfg = cfg.get("stats") or {}
+        disabled = {**(config.get("stats") or {}), "enabled": False}
+        if not await api.update_stats_config(guild_id, disabled):
+            await inter.edit_original_response(
+                content="API не подтвердило отключение статистики."
+            )
+            return
 
-        deleted_count = 0
+        deleted = failed = 0
         if delete_channels:
-            for _, dto_field in STAT_FIELD_MAP:
-                ch_id = stats_cfg.get(dto_field)
-                if ch_id and str(ch_id).isdigit():
-                    ch = guild.get_channel(int(ch_id))
-                    if ch:
-                        self.ignored_audit_ids.add(ch.id)
-                        try:
-                            await ch.delete(reason=f"Удаление статистики ({inter.author})")
-                            deleted_count += 1
-                            await asyncio.sleep(0.3)
-                        except disnake.HTTPException:
-                            pass
+            for _, field in STAT_FIELD_MAP:
+                channel_id = str(disabled.get(field) or "")
+                channel = guild.get_channel(int(channel_id)) if channel_id.isdecimal() else None
 
-            cat_id = stats_cfg.get("categoryId")
-            if cat_id and str(cat_id).isdigit():
-                cat = guild.get_channel(int(cat_id))
-                if isinstance(cat, disnake.CategoryChannel) and len(cat.channels) == 0:
-                    self.ignored_audit_ids.add(cat.id)
+                if isinstance(channel, disnake.VoiceChannel):
+                    self.ignored_audit_ids.add(channel.id)
                     try:
-                        await cat.delete(reason="Удаление пустой категории статистики")
-                    except disnake.HTTPException:
+                        await channel.delete(reason=f"Удаление статистики ({inter.author})")
+                    except disnake.NotFound:
                         pass
+                    except disnake.HTTPException:
+                        failed += 1
+                        continue
+                    else:
+                        deleted += 1
+                    finally:
+                        self.ignored_audit_ids.discard(channel.id)
 
-            await asyncio.sleep(1.0)
-            self.ignored_audit_ids.clear()
+                disabled[field] = None
 
-        reset_payload = {
-            "enabled": False,
-            "style": stats_cfg.get("style", "en"),
-            "categoryId": None,
-            "allMembersChannelId": None,
-            "membersChannelId": None,
-            "botsChannelId": None,
-            "channelsChannelId": None,
-            "rolesChannelId": None,
-            "voiceChannelId": None,
-        }
-        await api.update_stats_config(guild_id, reset_payload)
+            if not await api.update_stats_config(guild_id, disabled):
+                await inter.edit_original_response(
+                    content=(
+                        f"Статистика отключена. Удалено каналов: {deleted}. "
+                        "API не подтвердило сохранение списка каналов."
+                    )
+                )
+                return
+
         await inter.edit_original_response(
-            content=f"🗑️ Модуль статистики отключен! Удалено каналов: **{deleted_count}** шт."
+            content=f"Статистика отключена. Удалено каналов: {deleted}. Ошибок удаления: {failed}."
         )
 
     @commands.slash_command(
         contexts=GUILD_ONLY,
         name="server_stats",
-        description="📊 Подробная статистика сервера в реальном времени"
+        description="Показать статистику сервера",
     )
     async def server_stats(self, inter: disnake.ApplicationCommandInteraction):
         await inter.response.defer()
         guild = inter.guild
-        m = self._compute_metrics(guild, include_statuses=True)
+        metrics = self._compute_metrics(guild, include_statuses=True)
 
         embed = disnake.Embed(
             title=f"📊 Статистика сервера: {guild.name}",
             color=BRAND_COLOR,
-            timestamp=disnake.utils.utcnow()
+            timestamp=disnake.utils.utcnow(),
         )
         if guild.icon:
             embed.set_thumbnail(url=guild.icon.url)
 
         embed.add_field(
             name="👥 Участники",
-            value=f"Всего: **{m['all_members']}**\nЛюдей: **{m['members']}** | Ботов: **{m['bots']}**",
-            inline=True
+            value=(
+                f"Всего: **{metrics['all_members']}**\n"
+                f"Людей: **{metrics['members']}** | Ботов: **{metrics['bots']}**"
+            ),
+            inline=True,
         )
         embed.add_field(
             name="📡 Онлайн-активность",
-            value=f"🟢 В сети: **{m['online']}** | 🌙 Отошёл: **{m['idle']}**\n⛔ Не бесп.: **{m['dnd']}** | ⚫ Оффлайн: **{m['offline']}**",
-            inline=True
+            value=(
+                f"🟢 В сети: **{metrics['online']}** | 🌙 Отошли: **{metrics['idle']}**\n"
+                f"⛔ Не беспокоить: **{metrics['dnd']}** | ⚫ Офлайн: **{metrics['offline']}**"
+            ),
+            inline=True,
         )
         embed.add_field(
-            name="🔊 В голосовых каналах",
-            value=f"Сейчас общаются: **{m['voice']}** чел.",
-            inline=False
+            name="🔊 Голосовые каналы",
+            value=f"Сейчас общаются: **{metrics['voice']}** чел.",
+            inline=False,
         )
         embed.add_field(
             name="💬 Структура",
-            value=f"Каналов: **{m['channels']}** (Текст: {len(guild.text_channels)} | Голос: {len(guild.voice_channels)})\nРолей: **{m['roles']}**",
-            inline=True
+            value=(
+                f"Каналов: **{metrics['channels']}** "
+                f"(текстовых: {len(guild.text_channels)}, голосовых: {len(guild.voice_channels)})\n"
+                f"Ролей: **{metrics['roles']}**"
+            ),
+            inline=True,
         )
         embed.add_field(
-            name="🚀 Бусты сервера",
-            value=f"Уровень: **{guild.premium_tier}**\nБустов: **{guild.premium_subscription_count or 0}**",
-            inline=True
+            name="🚀 Бусты",
+            value=(
+                f"Уровень: **{guild.premium_tier}**\n"
+                f"Бустов: **{guild.premium_subscription_count or 0}**"
+            ),
+            inline=True,
         )
         embed.set_footer(text=UNIFIED_FOOTER)
         await inter.edit_original_response(embed=embed)

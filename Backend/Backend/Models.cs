@@ -36,6 +36,12 @@ public class GuildSecurityConfig
     public bool UseCaptcha { get; set; } = true;
     public bool AutoKickUnverified { get; set; } = false;
     public int VerifyTimeoutMinutes { get; set; } = 10;
+    public bool? AutomodInvites { get; set; }
+    public bool? AutomodSpam { get; set; }
+    public bool? AutomodMentions { get; set; }
+    public string? AutomodInvitesScope { get; set; }
+    public string? AutomodSpamScope { get; set; }
+    public string? AutomodMentionsScope { get; set; }
 }
 
 public class GuildWelcomeConfig

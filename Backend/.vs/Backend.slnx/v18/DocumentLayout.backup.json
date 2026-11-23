@@ -120,8 +120,7 @@
               "RelativeToolTip": "Backend\\Migrations\\20261116080249_AddStatsConfig.cs",
               "ViewState": "AgIAAB8AAAAAAAAAAAAgwAAAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-11-16T08:13:31.831Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-11-16T08:13:31.831Z"
             },
             {
               "$type": "Document",
@@ -143,7 +142,7 @@
               "RelativeDocumentMoniker": "Backend\\DTO\\DTOs.cs",
               "ToolTip": "C:\\Users\\theep\\OneDrive\\\u0420\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\Aigis-project\\Backend\\Backend\\DTO\\DTOs.cs",
               "RelativeToolTip": "Backend\\DTO\\DTOs.cs",
-              "ViewState": "AgIAABMAAAAAAAAAAAAYwDkAAAAZAAAAAAAAAA==",
+              "ViewState": "AgIAABgAAAAAAAAAAAAmwDYAAAAjAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2026-10-26T14:29:39.599Z",
               "EditorCaption": ""
@@ -156,7 +155,7 @@
               "RelativeDocumentMoniker": "Backend\\Models.cs",
               "ToolTip": "C:\\Users\\theep\\OneDrive\\\u0420\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\Aigis-project\\Backend\\Backend\\Models.cs",
               "RelativeToolTip": "Backend\\Models.cs",
-              "ViewState": "AgIAACoAAAAAAAAAAAAzwD0AAAAwAAAAAAAAAA==",
+              "ViewState": "AgIAABIAAAAAAAAAAAA8wCgAAAAuAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2026-10-22T14:57:20.698Z",
               "EditorCaption": ""
@@ -171,8 +170,7 @@
               "RelativeToolTip": "Backend\\Controllers\\RolesController.cs",
               "ViewState": "AgIAACIAAAAAAAAAAAAcwH4AAAABAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-10-26T15:26:01.723Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-10-26T15:26:01.723Z"
             },
             {
               "$type": "Document",
@@ -182,7 +180,7 @@
               "RelativeDocumentMoniker": "Backend\\Controllers\\ConfigController.cs",
               "ToolTip": "C:\\Users\\theep\\OneDrive\\\u0420\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B\\Aigis-project\\Backend\\Backend\\Controllers\\ConfigController.cs",
               "RelativeToolTip": "Backend\\Controllers\\ConfigController.cs",
-              "ViewState": "AgIAAIoAAAAAAAAAAAAAwFEBAAABAAAAAAAAAA==",
+              "ViewState": "AgIAABkAAAAAAAAAAAAuwHcBAAAFAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2026-10-22T14:57:17.621Z",
               "EditorCaption": ""
@@ -197,8 +195,7 @@
               "RelativeToolTip": "Backend\\Controllers\\UsersController.cs",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAAKsAAAABAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-10-26T14:42:27.074Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-10-26T14:42:27.074Z"
             },
             {
               "$type": "Document",
@@ -210,8 +207,7 @@
               "RelativeToolTip": "Backend\\Program.cs",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAABEAAAABAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-11-02T10:24:50.695Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-11-02T10:24:50.695Z"
             },
             {
               "$type": "Document",

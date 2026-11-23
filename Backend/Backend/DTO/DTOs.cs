@@ -39,8 +39,20 @@ public record SecurityConfigDto(
     string? TrapChannelId,
     bool UseCaptcha,
     bool AutoKickUnverified,
-    int VerifyTimeoutMinutes);
+    int VerifyTimeoutMinutes,
+    AutomodConfigDto? Automod = null);
 
+public record AutomodScopeDto(string Mode, string[] ChannelIds);
+
+public record AutomodConfigDto(
+    bool? Invites,
+    bool? Spam,
+    bool? Mentions,
+    Dictionary<string, AutomodScopeDto?> Scopes);
+
+public record UpdateAutomodFilterRequest(
+    bool? Enabled,
+    AutomodScopeDto? Scope = null);
 public record WelcomeConfigDto(
     string? ChannelId,
     string? Title,

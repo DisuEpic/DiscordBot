@@ -94,6 +94,24 @@ namespace DiscordBot_API.Migrations
                     b.Property<bool>("AutoKickUnverified")
                         .HasColumnType("boolean");
 
+                    b.Property<bool?>("AutomodInvites")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("AutomodInvitesScope")
+                        .HasColumnType("text");
+
+                    b.Property<bool?>("AutomodMentions")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("AutomodMentionsScope")
+                        .HasColumnType("text");
+
+                    b.Property<bool?>("AutomodSpam")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("AutomodSpamScope")
+                        .HasColumnType("text");
+
                     b.Property<string>("TrapChannelId")
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)");

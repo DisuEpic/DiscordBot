@@ -1,8 +1,10 @@
+from typing import Any, Dict, List
+
 import disnake
-from typing import List, Dict, Any
+
 from api import api
-from utils import parse_emoji, add_chunked_role_fields
 from config import BRAND_COLOR, UNIFIED_FOOTER
+from utils import add_chunked_role_fields, parse_emoji
 
 
 class VerifyView(disnake.ui.View):
@@ -10,33 +12,38 @@ class VerifyView(disnake.ui.View):
         self,
         button_label: str = "Пройти верификацию",
         button_emoji: str = "✅",
-        use_captcha: bool = False
+        use_captcha: bool = False,
     ):
         super().__init__(timeout=None)
         custom_id = "persistent_verify_captcha" if use_captcha else "persistent_verify_button"
-        self.add_item(disnake.ui.Button(
-            label=button_label,
-            style=disnake.ButtonStyle.success,
-            emoji=parse_emoji(button_emoji) or "✅",
-            custom_id=custom_id
-        ))
+        self.add_item(
+            disnake.ui.Button(
+                label=button_label,
+                style=disnake.ButtonStyle.success,
+                emoji=parse_emoji(button_emoji) or "✅",
+                custom_id=custom_id,
+            )
+        )
 
 
 def build_role_buttons_view(
     roles_subset: List[Dict[str, Any]],
     button_style: disnake.ButtonStyle = disnake.ButtonStyle.secondary,
-    single_choice: bool = False
+    single_choice: bool = False,
 ) -> disnake.ui.View:
     view = disnake.ui.View(timeout=None)
     prefix = "radio_role_" if single_choice else "toggle_role_"
-    for r in roles_subset[:25]:
-        emoji = parse_emoji(r.get("emoji"))
-        view.add_item(disnake.ui.Button(
-            label=r["name"][:80],
-            emoji=emoji,
-            style=button_style,
-            custom_id=f"{prefix}{r['roleId']}"
-        ))
+
+    for role in roles_subset[:25]:
+        view.add_item(
+            disnake.ui.Button(
+                label=role["name"][:80],
+                emoji=parse_emoji(role.get("emoji")),
+                style=button_style,
+                custom_id=f"{prefix}{role['roleId']}",
+            )
+        )
+
     return view
 
 
@@ -45,32 +52,41 @@ class ConfirmResetView(disnake.ui.View):
         super().__init__(timeout=30)
         self.author_id = author_id
 
-    @disnake.ui.button(label="Да, сбросить всё", style=disnake.ButtonStyle.danger, emoji="⚠️")
+    @disnake.ui.button(
+        label="Подтвердить сброс", style=disnake.ButtonStyle.danger, emoji="⚠️"
+    )
     async def confirm(self, button: disnake.ui.Button, inter: disnake.MessageInteraction):
         if inter.author.id != self.author_id:
-            await inter.response.send_message("❌ Только автор команды может управлять этой панелью.", ephemeral=True)
+            await inter.response.send_message(
+                "❌ Только автор команды может управлять этой панелью.", ephemeral=True
+            )
             return
 
         await inter.response.defer()
         if await api.reset_guild_config(str(inter.guild_id)):
             await inter.edit_original_response(
-                content="♻️ Все настройки сервера полностью сброшены к начальным.",
+                content="♻️ Настройки Mirei, управляемые этой панелью, сброшены.",
                 embed=None,
-                view=None
+                view=None,
             )
         else:
             await inter.edit_original_response(
-                content="❌ Не удалось сбросить настройки: API недоступен.",
+                content="❌ API не подтвердило сброс настроек.",
                 embed=None,
-                view=None
+                view=None,
             )
 
     @disnake.ui.button(label="Отмена", style=disnake.ButtonStyle.secondary, emoji="↩️")
     async def cancel(self, button: disnake.ui.Button, inter: disnake.MessageInteraction):
         if inter.author.id != self.author_id:
-            await inter.response.send_message("❌ Только автор команды может управлять этой панелью.", ephemeral=True)
+            await inter.response.send_message(
+                "❌ Только автор команды может управлять этой панелью.", ephemeral=True
+            )
             return
-        await inter.response.edit_message(content=None, view=SettingsDashboardView(self.author_id))
+
+        await inter.response.edit_message(
+            content=None, view=SettingsDashboardView(self.author_id)
+        )
 
 
 class SettingsDashboardView(disnake.ui.View):
@@ -79,114 +95,176 @@ class SettingsDashboardView(disnake.ui.View):
         self.author_id = author_id
 
     @disnake.ui.select(
-        placeholder="🗑️ Отключить / очистить отдельный параметр...",
+        placeholder="Отключить или сбросить настройку",
         options=[
-            disnake.SelectOption(label="Отключить роль верификации", value="verificationRoleId", emoji="🛡️"),
-            disnake.SelectOption(label="Отключить канал приветствий", value="welcomeChannelId", emoji="👋"),
-            disnake.SelectOption(label="Отключить канал аудита (логов)", value="logChannelId", emoji="📜"),
-            disnake.SelectOption(label="Отключить приватные войсы", value="voiceGeneratorChannelId", emoji="🔊"),
-            disnake.SelectOption(label="Сбросить шаблон имени войсов", value="voiceRoomTemplate", emoji="🏷️"),
-            disnake.SelectOption(label="Отключить канал-ловушку (Тишина)", value="trapChannelId", emoji="🤫"),
-            disnake.SelectOption(label="Сбросить текст шаблона приветствия", value="welcomeText", emoji="📝"),
-            disnake.SelectOption(label="Сбросить настройки ИИ к стандартным", value="aiReset", emoji="💠"),
-        ]
+            disnake.SelectOption(
+                label="Отключить роль верификации",
+                value="verificationRoleId",
+                emoji="🛡️",
+            ),
+            disnake.SelectOption(
+                label="Отключить канал приветствий",
+                value="welcomeChannelId",
+                emoji="👋",
+            ),
+            disnake.SelectOption(
+                label="Отключить канал журнала",
+                value="logChannelId",
+                emoji="📜",
+            ),
+            disnake.SelectOption(
+                label="Отключить временные голосовые комнаты",
+                value="voiceGeneratorChannelId",
+                emoji="🔊",
+            ),
+            disnake.SelectOption(
+                label="Сбросить шаблон имени комнат",
+                value="voiceRoomTemplate",
+                emoji="🏷️",
+            ),
+            disnake.SelectOption(
+                label="Отключить канал-ловушку",
+                value="trapChannelId",
+                emoji="🤫",
+            ),
+            disnake.SelectOption(
+                label="Сбросить текст приветствия",
+                value="welcomeText",
+                emoji="📝",
+            ),
+            disnake.SelectOption(
+                label="Сбросить настройки ИИ",
+                value="aiReset",
+                emoji="💠",
+            ),
+        ],
     )
-    async def remove_single_config(self, select: disnake.ui.Select, inter: disnake.MessageInteraction):
+    async def remove_single_config(
+        self, select: disnake.ui.Select, inter: disnake.MessageInteraction
+    ):
         if inter.author.id != self.author_id:
-            await inter.response.send_message("❌ Только автор команды может управлять этой панелью.", ephemeral=True)
+            await inter.response.send_message(
+                "❌ Только автор команды может управлять этой панелью.", ephemeral=True
+            )
             return
 
         await inter.response.defer(ephemeral=True)
         guild_id = str(inter.guild_id)
-        cfg = await api.get_guild_config(guild_id) or {}
+        cfg = await api.get_guild_config_for_update(guild_id)
+        if cfg is None:
+            await inter.edit_original_response(
+                content="API не вернуло настройки. Повтори попытку."
+            )
+            return
 
         choice = select.values[0]
-        labels_map = {
+        labels = {
             "verificationRoleId": "🛡️ Роль верификации отключена.",
-            "welcomeChannelId": "👋 Канал приветствий отключен.",
-            "logChannelId": "📜 Канал аудита (логов) отключен.",
-            "voiceGeneratorChannelId": "🔊 Создание приватных голосовых комнат отключено.",
-            "voiceRoomTemplate": "🏷️ Шаблон имени приватных войсов сброшен.",
-            "trapChannelId": "🤫 Канал-ловушка (Тишина) отключен.",
-            "welcomeText": "📝 Текст приветствия сброшен к стандартному.",
-            "aiReset": "💠 Настройки ИИ сброшены к стандартным."
+            "welcomeChannelId": "👋 Канал приветствий отключён.",
+            "logChannelId": "📜 Канал журнала отключён.",
+            "voiceGeneratorChannelId": "🔊 Создание временных комнат отключено.",
+            "voiceRoomTemplate": "🏷️ Шаблон имени комнат сброшен.",
+            "trapChannelId": "🤫 Канал-ловушка отключён.",
+            "welcomeText": "📝 Текст приветствия сброшен.",
+            "aiReset": "💠 Настройки ИИ сброшены.",
         }
 
-        ok = False
+        saved = False
         if choice in ("verificationRoleId", "trapChannelId"):
-            sec = dict(cfg.get("security") or {})
-            sec[choice] = None
-            ok = await api.update_security_config(guild_id, sec)
-        elif choice == "welcomeChannelId":
-            wel = dict(cfg.get("welcome") or {})
-            wel["channelId"] = None
-            ok = await api.update_welcome_config(guild_id, wel)
-        elif choice == "welcomeText":
-            wel = dict(cfg.get("welcome") or {})
-            wel["title"] = None
-            wel["description"] = None
-            ok = await api.update_welcome_config(guild_id, wel)
-        elif choice == "logChannelId":
-            ok = await api.update_general_config(guild_id, None)
-        elif choice == "voiceGeneratorChannelId":
-            voi = dict(cfg.get("voice") or {})
-            voi["generatorChannelId"] = None
-            ok = await api.update_voice_config(guild_id, voi)
-        elif choice == "voiceRoomTemplate":
-            voi = dict(cfg.get("voice") or {})
-            voi["roomTemplate"] = None
-            ok = await api.update_voice_config(guild_id, voi)
-        elif choice == "aiReset":
-            ok = await api.update_ai_config(guild_id, {
-                "enabled": True,
-                "provider": "auto",
-                "autoReplyChance": 0,
-                "customScenario": None,
-                "customRules": None,
-            })
+            security = dict(cfg.get("security") or {})
+            security[choice] = None
+            saved = await api.update_security_config(guild_id, security)
 
-        if ok:
-            await inter.followup.send(f"✅ {labels_map.get(choice, 'Параметр сброшен.')} Вызовите `/settings`, чтобы обновить панель.", ephemeral=True)
+        elif choice in ("welcomeChannelId", "welcomeText"):
+            welcome = dict(cfg.get("welcome") or {})
+            if choice == "welcomeChannelId":
+                welcome["channelId"] = None
+            else:
+                welcome["title"] = None
+                welcome["description"] = None
+            saved = await api.update_welcome_config(guild_id, welcome)
+
+        elif choice == "logChannelId":
+            saved = await api.update_general_config(guild_id, None)
+
+        elif choice in ("voiceGeneratorChannelId", "voiceRoomTemplate"):
+            voice = dict(cfg.get("voice") or {})
+            field = "generatorChannelId" if choice == "voiceGeneratorChannelId" else "roomTemplate"
+            voice[field] = None
+            saved = await api.update_voice_config(guild_id, voice)
+
+        elif choice == "aiReset":
+            saved = await api.update_ai_config(
+                guild_id,
+                {
+                    "enabled": True,
+                    "provider": "auto",
+                    "autoReplyChance": 0,
+                    "customScenario": None,
+                    "customRules": None,
+                },
+            )
+
+        if saved:
+            await inter.edit_original_response(
+                content=f"✅ {labels[choice]} Вызови `/settings`, чтобы обновить панель."
+            )
         else:
-            await inter.followup.send("❌ Не удалось сохранить настройки: API недоступен.", ephemeral=True)
+            await inter.edit_original_response(
+                content="❌ API не подтвердило сохранение настройки."
+            )
 
     @disnake.ui.button(label="Список ролей в БД", style=disnake.ButtonStyle.primary, emoji="📋")
     async def view_roles(self, button: disnake.ui.Button, inter: disnake.MessageInteraction):
         if inter.author.id != self.author_id:
-            await inter.response.send_message("❌ Только автор команды может просматривать эту панель.", ephemeral=True)
+            await inter.response.send_message(
+                "❌ Только автор команды может просматривать эту панель.", ephemeral=True
+            )
             return
 
         await inter.response.defer(ephemeral=True)
         all_roles = await api.get_roles(str(inter.guild_id))
-        guild_roles = [r for r in all_roles if str(r.get("roleId", "")).isdigit() and inter.guild.get_role(int(r["roleId"]))]
+        guild_roles = [
+            role
+            for role in all_roles
+            if str(role.get("roleId", "")).isdigit()
+            and inter.guild.get_role(int(role["roleId"]))
+        ]
 
         if not guild_roles:
-            await inter.edit_original_response(content="⚠️ В базе данных пока нет добавленных ролей для этого сервера.")
+            await inter.edit_original_response(
+                content="⚠️ В каталоге этого сервера пока нет добавленных ролей."
+            )
             return
 
         categories: Dict[str, List[Dict[str, Any]]] = {}
-        for r in guild_roles:
-            cat = r.get("category") or "Общие"
-            categories.setdefault(cat, []).append(r)
+        for role in guild_roles:
+            categories.setdefault(role.get("category") or "Общие", []).append(role)
 
         embed = disnake.Embed(
-            title="📋 Роли сервера, сохраненные в базе данных",
-            description="Список доступных ролей по категориям:",
-            color=BRAND_COLOR
+            title="📋 Роли сервера, сохранённые в базе данных",
+            description="Роли по категориям:",
+            color=BRAND_COLOR,
         )
-        for cat_name, r_list in categories.items():
-            add_chunked_role_fields(embed, f"📁 {cat_name}", r_list)
+        for category, roles in categories.items():
+            add_chunked_role_fields(embed, f"📁 {category}", roles)
         embed.set_footer(text=UNIFIED_FOOTER)
-
         await inter.edit_original_response(embed=embed)
 
-    @disnake.ui.button(label="Сбросить всё (Reset)", style=disnake.ButtonStyle.danger, emoji="♻️")
+    @disnake.ui.button(
+        label="Сбросить настройки", style=disnake.ButtonStyle.danger, emoji="♻️"
+    )
     async def full_reset(self, button: disnake.ui.Button, inter: disnake.MessageInteraction):
         if inter.author.id != self.author_id:
-            await inter.response.send_message("❌ Только автор команды может управлять этой панелью.", ephemeral=True)
+            await inter.response.send_message(
+                "❌ Только автор команды может управлять этой панелью.", ephemeral=True
+            )
             return
 
         await inter.response.edit_message(
-            content="⚠️ **Вы уверены?** Будут сброшены все каналы и настройки безопасности сервера. Действие необратимо.",
-            view=ConfirmResetView(self.author_id)
+            content=(
+                "⚠️ Сбросить настройки Mirei, управляемые этой панелью? "
+                "Фильтры Discord AutoMod управляются через `/automod`."
+            ),
+            view=ConfirmResetView(self.author_id),
         )
