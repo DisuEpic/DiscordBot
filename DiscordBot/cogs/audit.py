@@ -361,7 +361,7 @@ class Audit(commands.Cog):
                 description=(
                     f"За последние **{RAID_WINDOW_SECONDS} сек.** "
                     f"на сервер зашло **{len(joins)}** участников.\n"
-                    "При необходимости ограничьте отправку сообщений командой `/lock`."
+                    "При необходимости ограничьте отправку сообщений командой `/модерация закрыть`."
                 ),
                 color=COMBAT_RED,
                 timestamp=disnake.utils.utcnow(),

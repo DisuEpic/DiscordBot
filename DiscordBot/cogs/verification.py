@@ -13,8 +13,7 @@ from config import (
     CAPTCHA_ACCOUNT_DAYS, TACTICAL_GREEN, COMBAT_RED, UNIFIED_FOOTER, log,
 )
 from utils import (
-    send_log, send_welcome_card, check_moderation_target,
-    DEFAULT_WELCOME_TITLE, DEFAULT_WELCOME_DESC,
+    send_log, send_welcome_card, check_moderation_target
 )
 from views import VerifyView
 

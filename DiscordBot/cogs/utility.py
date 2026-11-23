@@ -12,6 +12,7 @@ from config import (
     UNIFIED_FOOTER,
     VERIFY_TIMEOUT_MINUTES,
 )
+from utils import DEFAULT_WELCOME_DESC, DEFAULT_WELCOME_TITLE
 from views import SettingsDashboardView
 
 
@@ -19,22 +20,32 @@ class Utility(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
+    # ------------------------------------------------------------------
+    # Категория /инфо (для всех участников)
+    # ------------------------------------------------------------------
     @commands.slash_command(
         contexts=GUILD_ONLY,
+        name="инфо",
+        description="Информация о боте, сервере и участниках",
+    )
+    async def info_group(self, inter: disnake.ApplicationCommandInteraction):
+        pass
+
+    @info_group.sub_command(
         name="помощь",
         description="💠 Список возможностей и команд Mirei",
     )
     async def help_cmd(self, inter: disnake.ApplicationCommandInteraction):
         embed = disnake.Embed(
             title="💠 Справочный центр Mirei",
-            description="Команды ИИ, модерации и настройки сервера.",
+            description="Все команды бота разбиты по категориям:",
             color=BRAND_COLOR,
         )
         if self.bot.user:
             embed.set_thumbnail(url=self.bot.user.display_avatar.url)
 
         embed.add_field(
-            name="🧠 ИИ-чат",
+            name="🧠 ИИ-чат (`/ии`)",
             value=(
                 "• Упомяни Mirei или ответь на её сообщение.\n"
                 "• Можно приложить картинку из Discord.\n"
@@ -43,51 +54,179 @@ class Utility(commands.Cog):
             inline=False,
         )
         embed.add_field(
-            name="🛡️ Защита, верификация и настройки",
+            name="🛡️ Верификация и настройки (`/верификация`, `/настройки`)",
             value=(
                 "• `/настройки настроить` — роли, каналы, капча, автокик, ловушка и голосовые комнаты.\n"
                 "• `/настройки показать` — текущая конфигурация и сброс параметров.\n"
-                "• `/верификация отправить_панель` и `/верификация обновить_панель` — панель верификации.\n"
-                "• `/настройки приветствие` — текст приветствия.\n"
-                "• `/верификация снять` — сброс верификации участника."
+                "• `/настройки приветствие` — текст карточки приветствия.\n"
+                "• `/настройки профиль_бд`, `/настройки проверить_вход` — диагностика профилей.\n"
+                "• `/верификация отправить_панель`, `/верификация обновить_панель`, `/верификация снять`."
             ),
             inline=False,
         )
 
         moderation_help = (
-            "• `/модерация мут`, `/модерация кик`, `/модерация бан`, "
-            "`/модерация разбан` — модерация участников.\n"
+            "• `/модерация мут`, `/модерация кик`, `/модерация бан`, `/модерация разбан`.\n"
             "• `/модерация очистить` — очистка до 100 последних сообщений.\n"
-            "• `/модерация закрыть`, `/модерация открыть`, "
-            "`/модерация медленный_режим` — управление чатом."
+            "• `/модерация закрыть`, `/модерация открыть`, `/модерация медленный_режим`."
         )
         if self.bot.get_cog("AutoModeration"):
-            moderation_help += "\n• `/автомод помощь` — фильтры и исключения."
-        embed.add_field(name="🔨 Модерация", value=moderation_help, inline=False)
+            moderation_help += "\n• `/автомод помощь`, `/автомод статус`, `/автомод настроить`."
+        embed.add_field(
+            name="🔨 Модерация (`/модерация`, `/автомод`)",
+            value=moderation_help,
+            inline=False,
+        )
 
         embed.add_field(
-            name="🔊 Голосовые комнаты и роли по кнопкам",
+            name="🔊 Голосовые комнаты и роли (`/роли`)",
             value=(
                 "• Войди в канал-генератор, чтобы создать временную комнату.\n"
-                "• `/роли добавить`, `/роли удалить`, `/роли панель отправить`, "
-                "`/роли панель отправить_все`, `/роли панель обновить` — каталог и панели ролей.\n"
-                "• `/роли выдать` и `/роли снять` — ручное управление ролями."
+                "• `/роли добавить`, `/роли удалить`, `/роли очистить_категорию`.\n"
+                "• `/роли панель отправить`, `/роли панель отправить_все`, `/роли панель обновить`.\n"
+                "• `/роли выдать`, `/роли снять` — ручное управление ролями."
             ),
             inline=False,
         )
         embed.add_field(
-            name="📊 Статистика и утилиты",
+            name="📊 Статистика и информация (`/статистика`, `/инфо`)",
             value=(
-                "• `/статистика настроить`, `/статистика обновить`, "
-                "`/статистика переключить`, `/статистика отключить` — счётчики в каналах.\n"
                 "• `/статистика сервер` — статистика сервера.\n"
-                "• `/профиль`, `/сервер`, `/аватар`, `/пинг`."
+                "• `/статистика настроить`, `/статистика обновить`, "
+                "`/статистика переключить`, `/статистика отключить`.\n"
+                "• `/инфо профиль`, `/инфо сервер`, `/инфо аватар`, `/инфо пинг`, `/инфо помощь`."
             ),
             inline=False,
         )
         embed.set_footer(text=UNIFIED_FOOTER)
         await inter.response.send_message(embed=embed, ephemeral=True)
 
+    @info_group.sub_command(
+        name="профиль",
+        description="Показать информацию об участнике",
+    )
+    async def scan(
+        self,
+        inter: disnake.ApplicationCommandInteraction,
+        member: Optional[disnake.Member] = commands.Param(
+            name="участник", default=None, description="Чей профиль показать"
+        ),
+    ):
+        target = member or inter.author
+        await inter.response.defer()
+
+        age_days = (disnake.utils.utcnow() - target.created_at).days
+        status = "👑 Администратор" if target.guild_permissions.administrator else "🟢 Участник"
+        top_role = target.top_role.mention if not target.top_role.is_default() else "Нет"
+
+        embed = disnake.Embed(
+            title=f"🔍 Профиль участника: {target.display_name}",
+            color=BRAND_COLOR,
+        )
+        embed.set_thumbnail(url=target.display_avatar.url)
+        embed.add_field(name="ID", value=f"`{target.id}`", inline=True)
+        embed.add_field(name="Статус", value=status, inline=True)
+        embed.add_field(name="Высшая роль", value=top_role, inline=True)
+        embed.add_field(
+            name="На сервере с",
+            value=target.joined_at.strftime("%d.%m.%Y") if target.joined_at else "Неизвестно",
+            inline=True,
+        )
+        embed.add_field(
+            name="Аккаунт создан",
+            value=f"{target.created_at.strftime('%d.%m.%Y')} ({age_days} дн.)",
+            inline=True,
+        )
+        embed.add_field(name="Роли", value=f"**{len(target.roles) - 1}** шт.", inline=True)
+        embed.set_footer(text=UNIFIED_FOOTER)
+        await inter.edit_original_response(embed=embed)
+
+    @info_group.sub_command(
+        name="сервер",
+        description="Показать информацию о сервере",
+    )
+    async def server_info(self, inter: disnake.ApplicationCommandInteraction):
+        guild = inter.guild
+        bots = sum(1 for member in guild.members if member.bot)
+        total = guild.member_count or len(guild.members)
+        humans = max(0, total - bots)
+
+        embed = disnake.Embed(
+            title=f"📊 Информация о сервере: {guild.name}",
+            color=BRAND_COLOR,
+        )
+        if guild.icon:
+            embed.set_thumbnail(url=guild.icon.url)
+
+        embed.add_field(name="👑 Владелец", value=f"<@{guild.owner_id}>", inline=True)
+        embed.add_field(name="📅 Создан", value=guild.created_at.strftime("%d.%m.%Y"), inline=True)
+        embed.add_field(
+            name="👥 Участники",
+            value=f"Всего: **{total}**\nЛюдей: {humans} | Ботов: {bots}",
+            inline=True,
+        )
+        embed.add_field(
+            name="💬 Каналы",
+            value=f"Текстовых: {len(guild.text_channels)} | Голосовых: {len(guild.voice_channels)}",
+            inline=True,
+        )
+        embed.add_field(name="🎭 Роли", value=f"Всего: **{len(guild.roles)}**", inline=True)
+        embed.add_field(
+            name="🛡️ Уровень верификации Discord",
+            value=str(guild.verification_level).capitalize(),
+            inline=True,
+        )
+        embed.set_footer(text=UNIFIED_FOOTER)
+        await inter.response.send_message(embed=embed)
+
+    @info_group.sub_command(
+        name="аватар",
+        description="Показать аватар участника",
+    )
+    async def avatar(
+        self,
+        inter: disnake.ApplicationCommandInteraction,
+        member: Optional[disnake.Member] = commands.Param(
+            name="участник", default=None, description="Чей аватар показать"
+        ),
+    ):
+        target = member or inter.author
+        avatar_url = target.display_avatar.url
+        embed = disnake.Embed(
+            title=f"🔍 Аватар: {target.display_name}",
+            description=f"[Скачать оригинал]({avatar_url})",
+            color=BRAND_COLOR,
+        )
+        embed.set_image(url=avatar_url)
+        embed.set_footer(text=UNIFIED_FOOTER)
+        await inter.response.send_message(embed=embed)
+
+    @info_group.sub_command(
+        name="пинг",
+        description="Проверить задержку Discord и состояние API",
+    )
+    async def ping(self, inter: disnake.ApplicationCommandInteraction):
+        await inter.response.defer()
+        started = time.monotonic()
+        backend_ok = await api.health()
+        backend_ms = round((time.monotonic() - started) * 1000)
+        backend_status = "🟢 В норме" if backend_ok else "🔴 Сбой связи"
+        discord_ms = round(self.bot.latency * 1000)
+
+        embed = disnake.Embed(title="💠 Диагностика Mirei", color=BRAND_COLOR)
+        embed.add_field(name="📡 Шлюз Discord", value=f"`{discord_ms} мс`", inline=True)
+        embed.add_field(
+            name="💾 API и база данных",
+            value=f"`{backend_ms} мс` ({backend_status})",
+            inline=True,
+        )
+        embed.add_field(name="⚡ Статус", value="В сети", inline=True)
+        embed.set_footer(text=UNIFIED_FOOTER)
+        await inter.edit_original_response(embed=embed)
+
+    # ------------------------------------------------------------------
+    # Категория /настройки (только администраторы)
+    # ------------------------------------------------------------------
     @commands.slash_command(
         contexts=GUILD_ONLY,
         name="настройки",
@@ -438,139 +577,93 @@ class Utility(commands.Cog):
         view = SettingsDashboardView(author_id=inter.author.id)
         await inter.edit_original_response(embed=embed, view=view)
 
-    @commands.slash_command(
-        contexts=GUILD_ONLY,
-        name="профиль",
-        description="Показать информацию об участнике",
+    @settings_group.sub_command(
+        name="приветствие",
+        description="Настроить текст карточки приветствия в базе данных",
     )
-    async def scan(
+    async def set_welcome(
         self,
         inter: disnake.ApplicationCommandInteraction,
-        member: Optional[disnake.Member] = commands.Param(
-            name="участник", default=None, description="Чей профиль показать"
+        title: Optional[str] = commands.Param(
+            name="заголовок",
+            default=None,
+            description="Заголовок (доступно: {user}, {server})",
+        ),
+        description: Optional[str] = commands.Param(
+            name="описание",
+            default=None,
+            description="Текст описания (доступно: {user}, {server})",
+        ),
+        reset_to_default: bool = commands.Param(
+            name="сбросить",
+            default=False,
+            description="Сбросить к тексту по умолчанию?",
         ),
     ):
-        target = member or inter.author
-        await inter.response.defer()
+        await inter.response.defer(ephemeral=True)
+        guild_id = str(inter.guild_id)
+        cfg = await api.get_guild_config_for_update(guild_id)
+        if cfg is None:
+            await inter.edit_original_response(
+                content="API не вернуло настройки. Повтори попытку."
+            )
+            return
 
-        age_days = (disnake.utils.utcnow() - target.created_at).days
-        status = "👑 Администратор" if target.guild_permissions.administrator else "🟢 Участник"
-        top_role = target.top_role.mention if not target.top_role.is_default() else "Нет"
+        welcome = dict(cfg.get("welcome") or {})
 
-        embed = disnake.Embed(
-            title=f"🔍 Профиль участника: {target.display_name}",
-            color=BRAND_COLOR,
-        )
-        embed.set_thumbnail(url=target.display_avatar.url)
-        embed.add_field(name="ID", value=f"`{target.id}`", inline=True)
-        embed.add_field(name="Статус", value=status, inline=True)
-        embed.add_field(name="Высшая роль", value=top_role, inline=True)
-        embed.add_field(
-            name="На сервере с",
-            value=target.joined_at.strftime("%d.%m.%Y") if target.joined_at else "Неизвестно",
-            inline=True,
-        )
-        embed.add_field(
-            name="Аккаунт создан",
-            value=f"{target.created_at.strftime('%d.%m.%Y')} ({age_days} дн.)",
-            inline=True,
-        )
-        embed.add_field(name="Роли", value=f"**{len(target.roles) - 1}** шт.", inline=True)
-        embed.set_footer(text=UNIFIED_FOOTER)
-        await inter.edit_original_response(embed=embed)
+        if reset_to_default:
+            welcome["title"] = None
+            welcome["description"] = None
+            if await api.update_welcome_config(guild_id, welcome):
+                message = "♻️ Приветствие сброшено к стандартному тексту."
+            else:
+                message = "❌ Ошибка сохранения в БД."
+            await inter.edit_original_response(content=message)
+            return
 
-    @commands.slash_command(
-        contexts=GUILD_ONLY,
-        name="пинг",
-        description="Проверить задержку Discord и состояние API",
-    )
-    async def ping(self, inter: disnake.ApplicationCommandInteraction):
-        await inter.response.defer()
-        started = time.monotonic()
-        backend_ok = await api.health()
-        backend_ms = round((time.monotonic() - started) * 1000)
-        backend_status = "🟢 В норме" if backend_ok else "🔴 Сбой связи"
-        discord_ms = round(self.bot.latency * 1000)
+        if not title and not description:
+            await inter.edit_original_response(
+                content="⚠️ Укажи новый заголовок или описание либо выбери сброс."
+            )
+            return
 
-        embed = disnake.Embed(title="💠 Диагностика Mirei", color=BRAND_COLOR)
-        embed.add_field(name="📡 Шлюз Discord", value=f"`{discord_ms} мс`", inline=True)
-        embed.add_field(
-            name="💾 API и база данных",
-            value=f"`{backend_ms} мс` ({backend_status})",
-            inline=True,
-        )
-        embed.add_field(name="⚡ Статус", value="В сети", inline=True)
-        embed.set_footer(text=UNIFIED_FOOTER)
-        await inter.edit_original_response(embed=embed)
+        if title:
+            welcome["title"] = title
+        if description:
+            welcome["description"] = description
 
-    @commands.slash_command(
-        contexts=GUILD_ONLY,
-        name="сервер",
-        description="Показать информацию о сервере",
-    )
-    async def server_info(self, inter: disnake.ApplicationCommandInteraction):
-        guild = inter.guild
-        bots = sum(1 for member in guild.members if member.bot)
-        total = guild.member_count or len(guild.members)
-        humans = max(0, total - bots)
+        if not await api.update_welcome_config(guild_id, welcome):
+            await inter.edit_original_response(
+                content="❌ Не удалось сохранить шаблон приветствия в базу данных."
+            )
+            return
 
-        embed = disnake.Embed(
-            title=f"📊 Информация о сервере: {guild.name}",
-            color=BRAND_COLOR,
+        sample_title = (
+            (welcome.get("title") or DEFAULT_WELCOME_TITLE)
+            .replace("{user}", inter.author.display_name)
+            .replace("{server}", inter.guild.name)
         )
-        if guild.icon:
-            embed.set_thumbnail(url=guild.icon.url)
+        sample_description = (
+            (welcome.get("description") or DEFAULT_WELCOME_DESC)
+            .replace("{user}", inter.author.mention)
+            .replace("{server}", inter.guild.name)
+        )
+        preview = disnake.Embed(
+            title=f"Предпросмотр: {sample_title}",
+            description=sample_description,
+            color=TACTICAL_GREEN,
+        )
+        preview.set_thumbnail(url=inter.author.display_avatar.url)
+        preview.set_footer(text=UNIFIED_FOOTER)
+        await inter.edit_original_response(
+            content="✅ Шаблон приветствия сохранён. Предпросмотр:",
+            embed=preview,
+        )
 
-        embed.add_field(name="👑 Владелец", value=f"<@{guild.owner_id}>", inline=True)
-        embed.add_field(name="📅 Создан", value=guild.created_at.strftime("%d.%m.%Y"), inline=True)
-        embed.add_field(
-            name="👥 Участники",
-            value=f"Всего: **{total}**\nЛюдей: {humans} | Ботов: {bots}",
-            inline=True,
-        )
-        embed.add_field(
-            name="💬 Каналы",
-            value=f"Текстовых: {len(guild.text_channels)} | Голосовых: {len(guild.voice_channels)}",
-            inline=True,
-        )
-        embed.add_field(name="🎭 Роли", value=f"Всего: **{len(guild.roles)}**", inline=True)
-        embed.add_field(
-            name="🛡️ Уровень верификации Discord",
-            value=str(guild.verification_level).capitalize(),
-            inline=True,
-        )
-        embed.set_footer(text=UNIFIED_FOOTER)
-        await inter.response.send_message(embed=embed)
-
-    @commands.slash_command(
-        contexts=GUILD_ONLY,
-        name="аватар",
-        description="Показать аватар участника",
-    )
-    async def avatar(
-        self,
-        inter: disnake.ApplicationCommandInteraction,
-        member: Optional[disnake.Member] = commands.Param(
-            name="участник", default=None, description="Чей аватар показать"
-        ),
-    ):
-        target = member or inter.author
-        avatar_url = target.display_avatar.url
-        embed = disnake.Embed(
-            title=f"🔍 Аватар: {target.display_name}",
-            description=f"[Скачать оригинал]({avatar_url})",
-            color=BRAND_COLOR,
-        )
-        embed.set_image(url=avatar_url)
-        embed.set_footer(text=UNIFIED_FOOTER)
-        await inter.response.send_message(embed=embed)
-
-    @commands.slash_command(
-        contexts=GUILD_ONLY,
+    @settings_group.sub_command(
         name="профиль_бд",
         description="Показать профиль участника в базе данных",
     )
-    @commands.default_member_permissions(administrator=True)
     async def user_profile(
         self,
         inter: disnake.ApplicationCommandInteraction,
@@ -604,12 +697,10 @@ class Utility(commands.Cog):
         embed.set_footer(text=UNIFIED_FOOTER)
         await inter.edit_original_response(embed=embed)
 
-    @commands.slash_command(
-        contexts=GUILD_ONLY,
+    @settings_group.sub_command(
         name="проверить_вход",
         description="Симулировать вход участника и проверить восстановление ролей",
     )
-    @commands.default_member_permissions(administrator=True)
     async def test_join(
         self,
         inter: disnake.ApplicationCommandInteraction,

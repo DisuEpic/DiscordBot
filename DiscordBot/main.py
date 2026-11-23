@@ -58,7 +58,7 @@ async def rotate_presence():
     count_str = f"{count:,}".replace(",", " ")
     activity = disnake.Activity(
         type=disnake.ActivityType.watching,
-        name=f"{count_str} {_plural_servers(count)} | /помощь"
+        name=f"{count_str} {_plural_servers(count)} | /инфо помощь"
     )
     await bot.change_presence(activity=activity)
 
